@@ -7,4 +7,5 @@ public sealed record EditorDocument(
     ImagePreview? OriginalPreview,
     ImagePreview? EnhancedPreview,
     EnhancementSuggestion Suggestion,
-    string Notice);
+    string Notice,
+    string InferenceStatus);

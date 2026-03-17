@@ -14,11 +14,15 @@ public sealed class ImageProcessingService : IImageProcessingService
 {
     private const int PreviewMaxDimension = 1400;
     private readonly IRawDecoder _rawDecoder;
+    private readonly ISubjectMaskInferenceService _subjectMaskInferenceService;
 
-    public ImageProcessingService(IRawDecoder rawDecoder)
+    public ImageProcessingService(IRawDecoder rawDecoder, ISubjectMaskInferenceService subjectMaskInferenceService)
     {
         _rawDecoder = rawDecoder;
+        _subjectMaskInferenceService = subjectMaskInferenceService;
     }
+
+    public string InferenceStatusSummary => _subjectMaskInferenceService.StatusSummary;
 
     public bool CanRender(string filePath)
     {
@@ -45,7 +49,7 @@ public sealed class ImageProcessingService : IImageProcessingService
         }
     }
 
-    public async Task<ImagePreview?> LoadPreviewAsync(string filePath, CancellationToken cancellationToken)
+    public async Task<ImagePreview?> LoadPreviewAsync(string filePath, CropStraightenSettings cropStraighten, CancellationToken cancellationToken)
     {
         var image = await LoadWorkingImageAsync(filePath, cancellationToken);
         if (image is null)
@@ -55,6 +59,7 @@ public sealed class ImageProcessingService : IImageProcessingService
 
         using (image)
         {
+            ApplyCropAndStraighten(image, cropStraighten);
             ResizeForPreview(image);
             return await EncodePreviewAsync(image, cancellationToken);
         }
@@ -75,7 +80,12 @@ public sealed class ImageProcessingService : IImageProcessingService
         }
     }
 
-    public async Task<ImagePreview?> RenderPreviewAsync(string filePath, EnhancementSuggestion suggestion, CancellationToken cancellationToken)
+    public async Task<ImagePreview?> RenderPreviewAsync(
+        string filePath,
+        EnhancementSuggestion suggestion,
+        CropStraightenSettings cropStraighten,
+        LocalizedMaskSettings localizedMask,
+        CancellationToken cancellationToken)
     {
         var image = await LoadWorkingImageAsync(filePath, cancellationToken);
         if (image is null)
@@ -85,10 +95,12 @@ public sealed class ImageProcessingService : IImageProcessingService
 
         using (image)
         {
+            ApplyCropAndStraighten(image, cropStraighten);
             ResizeForPreview(image);
 
             var settings = suggestion.Settings.ApplyFeatureMask(suggestion.EnabledFeatures);
             ApplyAdjustments(image, settings);
+            await ApplyLocalizedMaskAsync(image, localizedMask, cancellationToken);
 
             return await EncodePreviewAsync(image, cancellationToken);
         }
@@ -106,10 +118,11 @@ public sealed class ImageProcessingService : IImageProcessingService
         {
             Directory.CreateDirectory(request.Preset.OutputDirectory);
 
-            image.Mutate(context => context.AutoOrient());
+            ApplyCropAndStraighten(image, request.CropStraighten);
 
             var settings = request.Suggestion.Settings.ApplyFeatureMask(request.Suggestion.EnabledFeatures);
             ApplyAdjustments(image, settings);
+            await ApplyLocalizedMaskAsync(image, request.LocalizedMask, cancellationToken);
             ResizeForExport(image, request.Preset.LongEdgePixels);
 
             var outputPath = CreateUniqueOutputPath(request.Asset, request.Preset);
@@ -142,8 +155,6 @@ public sealed class ImageProcessingService : IImageProcessingService
     {
         image.Mutate(context =>
         {
-            context.AutoOrient();
-
             var maxDimension = Math.Max(image.Width, image.Height);
             if (maxDimension > maxDimensionTarget)
             {
@@ -218,6 +229,91 @@ public sealed class ImageProcessingService : IImageProcessingService
         }
     }
 
+    private static void ApplyCropAndStraighten(Image<Rgba32> image, CropStraightenSettings cropStraighten)
+    {
+        image.Mutate(context => context.AutoOrient());
+
+        if (Math.Abs(cropStraighten.RotationDegrees) > 0.001)
+        {
+            image.Mutate(context => context.Rotate((float)Math.Clamp(cropStraighten.RotationDegrees, -20.0, 20.0)));
+        }
+
+        if (cropStraighten.IsIdentity)
+        {
+            return;
+        }
+
+        var cropRectangle = ImageTransformMath.CalculateCropRectangle(image.Width, image.Height, cropStraighten);
+        image.Mutate(context => context.Crop(cropRectangle));
+    }
+
+    private async Task ApplyLocalizedMaskAsync(Image<Rgba32> image, LocalizedMaskSettings localizedMask, CancellationToken cancellationToken)
+    {
+        if (!localizedMask.HasVisibleEffect)
+        {
+            return;
+        }
+
+        SubjectMaskPrediction? subjectMask = null;
+        if (localizedMask.Kind == LocalizedMaskKind.Subject)
+        {
+            subjectMask = await _subjectMaskInferenceService.PredictMaskAsync(image, cancellationToken);
+            if (subjectMask is null)
+            {
+                return;
+            }
+        }
+
+        using var localizedImage = image.Clone();
+        ApplyAdjustments(localizedImage, ToLocalizedSettings(localizedMask.Adjustments));
+        BlendLocalizedMask(image, localizedImage, localizedMask, subjectMask);
+    }
+
+    private static void BlendLocalizedMask(
+        Image<Rgba32> baseImage,
+        Image<Rgba32> adjustedImage,
+        LocalizedMaskSettings localizedMask,
+        SubjectMaskPrediction? subjectMask)
+    {
+        baseImage.ProcessPixelRows(adjustedImage, (baseAccessor, adjustedAccessor) =>
+        {
+            for (var y = 0; y < baseAccessor.Height; y++)
+            {
+                var baseRow = baseAccessor.GetRowSpan(y);
+                var adjustedRow = adjustedAccessor.GetRowSpan(y);
+
+                for (var x = 0; x < baseRow.Length; x++)
+                {
+                    var weight = LocalizedMaskMath.GetMaskWeight(x, y, baseAccessor.Width, baseAccessor.Height, localizedMask, subjectMask);
+                    if (weight <= 0.001f)
+                    {
+                        continue;
+                    }
+
+                    ref var destination = ref baseRow[x];
+                    ref var source = ref adjustedRow[x];
+
+                    destination.R = Lerp(destination.R, source.R, weight);
+                    destination.G = Lerp(destination.G, source.G, weight);
+                    destination.B = Lerp(destination.B, source.B, weight);
+                }
+            }
+        });
+    }
+
+    private static EnhancementSettings ToLocalizedSettings(ManualEnhancementAdjustments adjustments) => new(
+        Exposure: adjustments.Exposure,
+        Contrast: adjustments.Contrast,
+        Vibrance: adjustments.Vibrance,
+        Warmth: adjustments.Warmth,
+        Saturation: adjustments.Saturation,
+        HighlightRecovery: Math.Max(0.0, adjustments.HighlightRecovery),
+        ShadowLift: adjustments.ShadowLift,
+        SkinSoftening: Math.Max(0.0, adjustments.SkinSoftening),
+        Denoise: Math.Max(0.0, adjustments.Denoise),
+        Sharpen: Math.Max(0.0, adjustments.Sharpen),
+        UpscaleFactor: 1.0);
+
     private static void ApplyWarmth(Image<Rgba32> image, double warmth)
     {
         var redLift = (float)Math.Clamp(warmth * 18.0, -12.0, 12.0);
@@ -288,6 +384,9 @@ public sealed class ImageProcessingService : IImageProcessingService
     }
 
     private static byte ClampToByte(float value) => (byte)Math.Clamp((int)Math.Round(value), 0, 255);
+
+    private static byte Lerp(byte from, byte to, float weight) =>
+        (byte)Math.Clamp((int)Math.Round(from + ((to - from) * weight)), 0, 255);
 
     private async Task<Image<Rgba32>?> LoadWorkingImageAsync(string filePath, CancellationToken cancellationToken)
     {

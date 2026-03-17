@@ -94,6 +94,28 @@ public sealed class SqliteCatalogService : ICatalogService
                 ManualSkinSoftening REAL NOT NULL,
                 ManualDenoise REAL NOT NULL,
                 ManualSharpen REAL NOT NULL,
+                CropRotationDegrees REAL NOT NULL DEFAULT 0,
+                CropZoom REAL NOT NULL DEFAULT 0,
+                CropOffsetX REAL NOT NULL DEFAULT 0,
+                CropOffsetY REAL NOT NULL DEFAULT 0,
+                LocalizedMaskEnabled INTEGER NOT NULL DEFAULT 0,
+                LocalizedMaskKind INTEGER NOT NULL DEFAULT 1,
+                LocalizedMaskCenterX REAL NOT NULL DEFAULT 0.5,
+                LocalizedMaskCenterY REAL NOT NULL DEFAULT 0.5,
+                LocalizedMaskWidth REAL NOT NULL DEFAULT 0.55,
+                LocalizedMaskHeight REAL NOT NULL DEFAULT 0.55,
+                LocalizedMaskFeather REAL NOT NULL DEFAULT 0.25,
+                LocalizedMaskAngleDegrees REAL NOT NULL DEFAULT 0,
+                LocalizedMaskInvert INTEGER NOT NULL DEFAULT 0,
+                LocalizedMaskIntensity REAL NOT NULL DEFAULT 0.85,
+                LocalizedExposure REAL NOT NULL DEFAULT 0,
+                LocalizedContrast REAL NOT NULL DEFAULT 0,
+                LocalizedWarmth REAL NOT NULL DEFAULT 0,
+                LocalizedSaturation REAL NOT NULL DEFAULT 0,
+                LocalizedVibrance REAL NOT NULL DEFAULT 0,
+                LocalizedSkinSoftening REAL NOT NULL DEFAULT 0,
+                LocalizedDenoise REAL NOT NULL DEFAULT 0,
+                LocalizedSharpen REAL NOT NULL DEFAULT 0,
                 CreatedAt TEXT NOT NULL
             );
 
@@ -106,6 +128,7 @@ public sealed class SqliteCatalogService : ICatalogService
 
         await command.ExecuteNonQueryAsync(cancellationToken);
         await EnsureFeedbackStyleProfileColumnAsync(connection, cancellationToken);
+        await EnsurePresetColumnsAsync(connection, cancellationToken);
     }
 
     public async Task<IReadOnlyList<CatalogFolder>> GetFoldersAsync(CancellationToken cancellationToken)
@@ -408,11 +431,21 @@ public sealed class SqliteCatalogService : ICatalogService
             INSERT INTO Presets (
                 Name, FeatureMask, Strength, ManualExposure, ManualContrast, ManualWarmth, ManualSaturation,
                 ManualVibrance, ManualHighlightRecovery, ManualShadowLift, ManualSkinSoftening, ManualDenoise,
-                ManualSharpen, CreatedAt)
+                ManualSharpen, CropRotationDegrees, CropZoom, CropOffsetX, CropOffsetY,
+                LocalizedMaskEnabled, LocalizedMaskKind, LocalizedMaskCenterX, LocalizedMaskCenterY,
+                LocalizedMaskWidth, LocalizedMaskHeight, LocalizedMaskFeather, LocalizedMaskAngleDegrees,
+                LocalizedMaskInvert, LocalizedMaskIntensity, LocalizedExposure, LocalizedContrast,
+                LocalizedWarmth, LocalizedSaturation, LocalizedVibrance, LocalizedSkinSoftening,
+                LocalizedDenoise, LocalizedSharpen, CreatedAt)
             VALUES (
                 $name, $featureMask, $strength, $manualExposure, $manualContrast, $manualWarmth, $manualSaturation,
                 $manualVibrance, $manualHighlightRecovery, $manualShadowLift, $manualSkinSoftening, $manualDenoise,
-                $manualSharpen, $createdAt)
+                $manualSharpen, $cropRotationDegrees, $cropZoom, $cropOffsetX, $cropOffsetY,
+                $localizedMaskEnabled, $localizedMaskKind, $localizedMaskCenterX, $localizedMaskCenterY,
+                $localizedMaskWidth, $localizedMaskHeight, $localizedMaskFeather, $localizedMaskAngleDegrees,
+                $localizedMaskInvert, $localizedMaskIntensity, $localizedExposure, $localizedContrast,
+                $localizedWarmth, $localizedSaturation, $localizedVibrance, $localizedSkinSoftening,
+                $localizedDenoise, $localizedSharpen, $createdAt)
             ON CONFLICT(Name) DO UPDATE SET
                 FeatureMask = excluded.FeatureMask,
                 Strength = excluded.Strength,
@@ -426,6 +459,28 @@ public sealed class SqliteCatalogService : ICatalogService
                 ManualSkinSoftening = excluded.ManualSkinSoftening,
                 ManualDenoise = excluded.ManualDenoise,
                 ManualSharpen = excluded.ManualSharpen,
+                CropRotationDegrees = excluded.CropRotationDegrees,
+                CropZoom = excluded.CropZoom,
+                CropOffsetX = excluded.CropOffsetX,
+                CropOffsetY = excluded.CropOffsetY,
+                LocalizedMaskEnabled = excluded.LocalizedMaskEnabled,
+                LocalizedMaskKind = excluded.LocalizedMaskKind,
+                LocalizedMaskCenterX = excluded.LocalizedMaskCenterX,
+                LocalizedMaskCenterY = excluded.LocalizedMaskCenterY,
+                LocalizedMaskWidth = excluded.LocalizedMaskWidth,
+                LocalizedMaskHeight = excluded.LocalizedMaskHeight,
+                LocalizedMaskFeather = excluded.LocalizedMaskFeather,
+                LocalizedMaskAngleDegrees = excluded.LocalizedMaskAngleDegrees,
+                LocalizedMaskInvert = excluded.LocalizedMaskInvert,
+                LocalizedMaskIntensity = excluded.LocalizedMaskIntensity,
+                LocalizedExposure = excluded.LocalizedExposure,
+                LocalizedContrast = excluded.LocalizedContrast,
+                LocalizedWarmth = excluded.LocalizedWarmth,
+                LocalizedSaturation = excluded.LocalizedSaturation,
+                LocalizedVibrance = excluded.LocalizedVibrance,
+                LocalizedSkinSoftening = excluded.LocalizedSkinSoftening,
+                LocalizedDenoise = excluded.LocalizedDenoise,
+                LocalizedSharpen = excluded.LocalizedSharpen,
                 CreatedAt = excluded.CreatedAt;
             """;
 
@@ -442,6 +497,28 @@ public sealed class SqliteCatalogService : ICatalogService
         command.Parameters.AddWithValue("$manualSkinSoftening", preset.ManualAdjustments.SkinSoftening);
         command.Parameters.AddWithValue("$manualDenoise", preset.ManualAdjustments.Denoise);
         command.Parameters.AddWithValue("$manualSharpen", preset.ManualAdjustments.Sharpen);
+        command.Parameters.AddWithValue("$cropRotationDegrees", preset.CropStraighten.RotationDegrees);
+        command.Parameters.AddWithValue("$cropZoom", preset.CropStraighten.Zoom);
+        command.Parameters.AddWithValue("$cropOffsetX", preset.CropStraighten.OffsetX);
+        command.Parameters.AddWithValue("$cropOffsetY", preset.CropStraighten.OffsetY);
+        command.Parameters.AddWithValue("$localizedMaskEnabled", preset.LocalizedMask.IsEnabled ? 1 : 0);
+        command.Parameters.AddWithValue("$localizedMaskKind", (int)preset.LocalizedMask.Kind);
+        command.Parameters.AddWithValue("$localizedMaskCenterX", preset.LocalizedMask.CenterX);
+        command.Parameters.AddWithValue("$localizedMaskCenterY", preset.LocalizedMask.CenterY);
+        command.Parameters.AddWithValue("$localizedMaskWidth", preset.LocalizedMask.Width);
+        command.Parameters.AddWithValue("$localizedMaskHeight", preset.LocalizedMask.Height);
+        command.Parameters.AddWithValue("$localizedMaskFeather", preset.LocalizedMask.Feather);
+        command.Parameters.AddWithValue("$localizedMaskAngleDegrees", preset.LocalizedMask.AngleDegrees);
+        command.Parameters.AddWithValue("$localizedMaskInvert", preset.LocalizedMask.Invert ? 1 : 0);
+        command.Parameters.AddWithValue("$localizedMaskIntensity", preset.LocalizedMask.Intensity);
+        command.Parameters.AddWithValue("$localizedExposure", preset.LocalizedMask.Adjustments.Exposure);
+        command.Parameters.AddWithValue("$localizedContrast", preset.LocalizedMask.Adjustments.Contrast);
+        command.Parameters.AddWithValue("$localizedWarmth", preset.LocalizedMask.Adjustments.Warmth);
+        command.Parameters.AddWithValue("$localizedSaturation", preset.LocalizedMask.Adjustments.Saturation);
+        command.Parameters.AddWithValue("$localizedVibrance", preset.LocalizedMask.Adjustments.Vibrance);
+        command.Parameters.AddWithValue("$localizedSkinSoftening", preset.LocalizedMask.Adjustments.SkinSoftening);
+        command.Parameters.AddWithValue("$localizedDenoise", preset.LocalizedMask.Adjustments.Denoise);
+        command.Parameters.AddWithValue("$localizedSharpen", preset.LocalizedMask.Adjustments.Sharpen);
         command.Parameters.AddWithValue("$createdAt", preset.CreatedAt.ToString("O"));
 
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -457,7 +534,11 @@ public sealed class SqliteCatalogService : ICatalogService
             """
             SELECT Id, Name, FeatureMask, Strength, ManualExposure, ManualContrast, ManualWarmth, ManualSaturation,
                    ManualVibrance, ManualHighlightRecovery, ManualShadowLift, ManualSkinSoftening, ManualDenoise,
-                   ManualSharpen, CreatedAt
+                   ManualSharpen, CropRotationDegrees, CropZoom, CropOffsetX, CropOffsetY, LocalizedMaskEnabled,
+                   LocalizedMaskKind, LocalizedMaskCenterX, LocalizedMaskCenterY, LocalizedMaskWidth, LocalizedMaskHeight,
+                   LocalizedMaskFeather, LocalizedMaskAngleDegrees, LocalizedMaskInvert, LocalizedMaskIntensity,
+                   LocalizedExposure, LocalizedContrast, LocalizedWarmth, LocalizedSaturation, LocalizedVibrance,
+                   LocalizedSkinSoftening, LocalizedDenoise, LocalizedSharpen, CreatedAt
             FROM Presets
             ORDER BY Name COLLATE NOCASE ASC;
             """;
@@ -481,7 +562,34 @@ public sealed class SqliteCatalogService : ICatalogService
                     reader.GetDouble(11),
                     reader.GetDouble(12),
                     reader.GetDouble(13)),
-                DateTimeOffset.Parse(reader.GetString(14))));
+                new CropStraightenSettings(
+                    reader.GetDouble(14),
+                    reader.GetDouble(15),
+                    reader.GetDouble(16),
+                    reader.GetDouble(17)),
+                new LocalizedMaskSettings(
+                    reader.GetInt64(18) == 1,
+                    (LocalizedMaskKind)reader.GetInt32(19),
+                    reader.GetDouble(20),
+                    reader.GetDouble(21),
+                    reader.GetDouble(22),
+                    reader.GetDouble(23),
+                    reader.GetDouble(24),
+                    reader.GetDouble(25),
+                    reader.GetInt64(26) == 1,
+                    reader.GetDouble(27),
+                    new ManualEnhancementAdjustments(
+                        reader.GetDouble(28),
+                        reader.GetDouble(29),
+                        reader.GetDouble(30),
+                        reader.GetDouble(31),
+                        reader.GetDouble(32),
+                        0,
+                        0,
+                        reader.GetDouble(33),
+                        reader.GetDouble(34),
+                        reader.GetDouble(35))),
+                DateTimeOffset.Parse(reader.GetString(36))));
         }
 
         return presets;
@@ -659,5 +767,66 @@ public sealed class SqliteCatalogService : ICatalogService
         await using var alterCommand = connection.CreateCommand();
         alterCommand.CommandText = "ALTER TABLE Feedback ADD COLUMN StyleProfileId INTEGER NULL;";
         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task EnsurePresetColumnsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var columns = await GetTableColumnsAsync(connection, "Presets", cancellationToken);
+
+        await EnsureColumnAsync(connection, columns, "CropRotationDegrees", "ALTER TABLE Presets ADD COLUMN CropRotationDegrees REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "CropZoom", "ALTER TABLE Presets ADD COLUMN CropZoom REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "CropOffsetX", "ALTER TABLE Presets ADD COLUMN CropOffsetX REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "CropOffsetY", "ALTER TABLE Presets ADD COLUMN CropOffsetY REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskEnabled", "ALTER TABLE Presets ADD COLUMN LocalizedMaskEnabled INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskKind", "ALTER TABLE Presets ADD COLUMN LocalizedMaskKind INTEGER NOT NULL DEFAULT 1;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskCenterX", "ALTER TABLE Presets ADD COLUMN LocalizedMaskCenterX REAL NOT NULL DEFAULT 0.5;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskCenterY", "ALTER TABLE Presets ADD COLUMN LocalizedMaskCenterY REAL NOT NULL DEFAULT 0.5;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskWidth", "ALTER TABLE Presets ADD COLUMN LocalizedMaskWidth REAL NOT NULL DEFAULT 0.55;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskHeight", "ALTER TABLE Presets ADD COLUMN LocalizedMaskHeight REAL NOT NULL DEFAULT 0.55;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskFeather", "ALTER TABLE Presets ADD COLUMN LocalizedMaskFeather REAL NOT NULL DEFAULT 0.25;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskAngleDegrees", "ALTER TABLE Presets ADD COLUMN LocalizedMaskAngleDegrees REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskInvert", "ALTER TABLE Presets ADD COLUMN LocalizedMaskInvert INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedMaskIntensity", "ALTER TABLE Presets ADD COLUMN LocalizedMaskIntensity REAL NOT NULL DEFAULT 0.85;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedExposure", "ALTER TABLE Presets ADD COLUMN LocalizedExposure REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedContrast", "ALTER TABLE Presets ADD COLUMN LocalizedContrast REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedWarmth", "ALTER TABLE Presets ADD COLUMN LocalizedWarmth REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedSaturation", "ALTER TABLE Presets ADD COLUMN LocalizedSaturation REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedVibrance", "ALTER TABLE Presets ADD COLUMN LocalizedVibrance REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedSkinSoftening", "ALTER TABLE Presets ADD COLUMN LocalizedSkinSoftening REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedDenoise", "ALTER TABLE Presets ADD COLUMN LocalizedDenoise REAL NOT NULL DEFAULT 0;", cancellationToken);
+        await EnsureColumnAsync(connection, columns, "LocalizedSharpen", "ALTER TABLE Presets ADD COLUMN LocalizedSharpen REAL NOT NULL DEFAULT 0;", cancellationToken);
+    }
+
+    private static async Task<HashSet<string>> GetTableColumnsAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var pragmaCommand = connection.CreateCommand();
+        pragmaCommand.CommandText = $"PRAGMA table_info({tableName});";
+
+        await using var reader = await pragmaCommand.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
+    }
+
+    private static async Task EnsureColumnAsync(
+        SqliteConnection connection,
+        ISet<string> existingColumns,
+        string columnName,
+        string alterStatement,
+        CancellationToken cancellationToken)
+    {
+        if (existingColumns.Contains(columnName))
+        {
+            return;
+        }
+
+        await using var alterCommand = connection.CreateCommand();
+        alterCommand.CommandText = alterStatement;
+        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+        existingColumns.Add(columnName);
     }
 }

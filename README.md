@@ -25,6 +25,8 @@ What is working now:
 - one-click enhancement preview
 - feature toggles for enhancement passes
 - manual fine-tune sliders
+- crop and straighten controls
+- localized masking with radial, linear, and AI-subject modes
 - saved enhancement presets
 - style profiles with accept/decline feedback learning
 - batch export to `JPG` and `PNG`
@@ -33,12 +35,12 @@ What is working now:
 - install and uninstall PowerShell scripts
 - JPEG, PNG, and RAW catalog support
 - RAW decode chain using `WIC` and `LibRaw`
+- ONNX Runtime + DirectML inference plumbing for AI subject masks
 
 What is still incomplete:
 - true production-grade RAW workflow validation across real camera samples
 - advanced localized masking
-- crop / straighten tools
-- GPU inference models through `ONNX Runtime + DirectML`
+- production-validated subject segmentation model distribution
 
 ## Tech Stack
 
@@ -73,6 +75,8 @@ What is still incomplete:
   - style learning
 - Enhancement strength slider
 - Before/after preview tabs
+- Crop zoom, crop offset, and straighten controls
+- On-canvas crop and localized-mask repositioning in the Enhanced preview tab
 - Manual fine-tune controls for:
   - exposure
   - contrast
@@ -87,10 +91,27 @@ What is still incomplete:
 
 ### Learning and Reuse
 
-- Save named enhancement presets
+- Save named enhancement presets, including crop/straighten and localized-mask settings
 - Create named style profiles
 - Accept or decline results to train a selected profile
 - Fall back to catalog-wide history when no style profile is selected
+
+### Localized Masking
+
+- Radial mask
+- Linear gradient mask
+- AI subject mask mode backed by `ONNX Runtime + DirectML`
+- Drag the localized mask directly in the Enhanced preview tab
+- Use the mouse wheel in the Enhanced preview tab to resize the active crop/mask tool
+- Localized adjustments for:
+  - exposure
+  - contrast
+  - warmth
+  - saturation
+  - vibrance
+  - skin softening
+  - denoise
+  - sharpen
 
 ### Export
 
@@ -197,6 +218,21 @@ Default install location:
 %LocalAppData%\Programs\ColorGrader
 ```
 
+## AI Subject Mask Model
+
+The app now includes optional AI subject-mask inference through `ONNX Runtime + DirectML`.
+
+To enable it, place a compatible segmentation model here:
+
+```text
+%LocalAppData%\ColorGrader\models\subject-mask.onnx
+```
+
+Notes:
+- if DirectML initializes successfully, the app uses the GPU path
+- if DirectML initialization fails, the app attempts a CPU fallback
+- if no model is present, radial and linear localized masks still work
+
 ## Local Storage
 
 The app stores its local data here:
@@ -214,13 +250,12 @@ That folder currently contains:
 - The app is local-first and intended for lawful photography workflows.
 - No cloud account is required.
 - The current enhancement logic is deterministic and feedback-driven; it is not yet using a dedicated GPU inference model.
-- The codebase is already structured so `DirectML` / `ONNX Runtime` integration can be added later.
+- The current GPU inference path is used for optional AI subject masks when a compatible ONNX model is installed.
 
 ## Roadmap
 
 - validate RAW processing against real camera files
-- add crop and straighten
-- add localized masking and skin-aware region tools
+- improve localized masking with richer region tools and better subject models
 - add stronger model-based denoise / upscale passes
 - add publish profiles for Windows release builds
 

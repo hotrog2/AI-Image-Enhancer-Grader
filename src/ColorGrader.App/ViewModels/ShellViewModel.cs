@@ -26,6 +26,8 @@ public partial class ShellViewModel(
     public ObservableCollection<StyleProfile> StyleProfiles { get; } = [];
     public IReadOnlyList<ExportFileFormat> ExportFormats { get; } = Enum.GetValues<ExportFileFormat>();
     public IReadOnlyList<EditorCompareMode> CompareModes { get; } = Enum.GetValues<EditorCompareMode>();
+    public IReadOnlyList<LocalizedMaskKind> LocalizedMaskKinds { get; } = Enum.GetValues<LocalizedMaskKind>();
+    public IReadOnlyList<CanvasEditorTool> CanvasEditorTools { get; } = Enum.GetValues<CanvasEditorTool>();
 
     [ObservableProperty]
     private CatalogAssetListItem? selectedLibraryItem;
@@ -50,6 +52,9 @@ public partial class ShellViewModel(
 
     [ObservableProperty]
     private string confidenceText = "Confidence --";
+
+    [ObservableProperty]
+    private string inferenceStatusText = "AI subject mask unavailable until a subject segmentation ONNX model is installed.";
 
     [ObservableProperty]
     private string selectedAssetSummary = "Choose a photo from the library";
@@ -146,6 +151,75 @@ public partial class ShellViewModel(
 
     [ObservableProperty]
     private double manualSharpen;
+
+    [ObservableProperty]
+    private double straightenAngle;
+
+    [ObservableProperty]
+    private double cropZoom;
+
+    [ObservableProperty]
+    private double cropOffsetX;
+
+    [ObservableProperty]
+    private double cropOffsetY;
+
+    [ObservableProperty]
+    private bool localizedMaskEnabled;
+
+    [ObservableProperty]
+    private LocalizedMaskKind selectedLocalizedMaskKind = LocalizedMaskKind.Radial;
+
+    [ObservableProperty]
+    private double localizedMaskCenterX = 0.5;
+
+    [ObservableProperty]
+    private double localizedMaskCenterY = 0.5;
+
+    [ObservableProperty]
+    private double localizedMaskWidth = 0.55;
+
+    [ObservableProperty]
+    private double localizedMaskHeight = 0.55;
+
+    [ObservableProperty]
+    private double localizedMaskFeather = 0.25;
+
+    [ObservableProperty]
+    private double localizedMaskAngle;
+
+    [ObservableProperty]
+    private bool invertLocalizedMask;
+
+    [ObservableProperty]
+    private double localizedMaskIntensity = 0.85;
+
+    [ObservableProperty]
+    private double localizedExposure;
+
+    [ObservableProperty]
+    private double localizedContrast;
+
+    [ObservableProperty]
+    private double localizedWarmth;
+
+    [ObservableProperty]
+    private double localizedSaturation;
+
+    [ObservableProperty]
+    private double localizedVibrance;
+
+    [ObservableProperty]
+    private double localizedSkinSoftening;
+
+    [ObservableProperty]
+    private double localizedDenoise;
+
+    [ObservableProperty]
+    private double localizedSharpen;
+
+    [ObservableProperty]
+    private CanvasEditorTool selectedCanvasEditorTool = CanvasEditorTool.Crop;
 
     [ObservableProperty]
     private SavedPreset? selectedPreset;
@@ -253,6 +327,44 @@ public partial class ShellViewModel(
     }
 
     [RelayCommand]
+    private void ResetCropStraighten()
+    {
+        _suppressPreviewRefresh = true;
+        StraightenAngle = 0;
+        CropZoom = 0;
+        CropOffsetX = 0;
+        CropOffsetY = 0;
+        _suppressPreviewRefresh = false;
+        _ = LoadSelectedAssetAsync();
+    }
+
+    [RelayCommand]
+    private void ResetLocalizedMask()
+    {
+        _suppressPreviewRefresh = true;
+        LocalizedMaskEnabled = false;
+        SelectedLocalizedMaskKind = LocalizedMaskKind.Radial;
+        LocalizedMaskCenterX = 0.5;
+        LocalizedMaskCenterY = 0.5;
+        LocalizedMaskWidth = 0.55;
+        LocalizedMaskHeight = 0.55;
+        LocalizedMaskFeather = 0.25;
+        LocalizedMaskAngle = 0;
+        InvertLocalizedMask = false;
+        LocalizedMaskIntensity = 0.85;
+        LocalizedExposure = 0;
+        LocalizedContrast = 0;
+        LocalizedWarmth = 0;
+        LocalizedSaturation = 0;
+        LocalizedVibrance = 0;
+        LocalizedSkinSoftening = 0;
+        LocalizedDenoise = 0;
+        LocalizedSharpen = 0;
+        _suppressPreviewRefresh = false;
+        _ = LoadSelectedAssetAsync();
+    }
+
+    [RelayCommand]
     private async Task SavePresetAsync()
     {
         var normalizedName = string.IsNullOrWhiteSpace(NewPresetName)
@@ -267,6 +379,8 @@ public partial class ShellViewModel(
             BuildFeatureMask(),
             Math.Clamp(EnhancementStrength, 0.0, 1.0),
             BuildManualAdjustments(),
+            BuildCropStraightenSettings(),
+            BuildLocalizedMaskSettings(),
             DateTimeOffset.UtcNow);
 
         await workflowService.SavePresetAsync(preset, CancellationToken.None);
@@ -491,6 +605,8 @@ public partial class ShellViewModel(
                 BuildFeatureMask(),
                 EnhancementStrength,
                 BuildManualAdjustments(),
+                BuildCropStraightenSettings(),
+                BuildLocalizedMaskSettings(),
                 SelectedStyleProfile?.Id,
                 _editorCancellationSource.Token);
 
@@ -501,6 +617,7 @@ public partial class ShellViewModel(
                 : document.Notice;
             SuggestionRationale = document.Suggestion.Rationale;
             ConfidenceText = $"Confidence {document.Suggestion.Confidence:P0}";
+            InferenceStatusText = document.InferenceStatus;
             CurrentSuggestion = document.Suggestion;
             StatusText = $"Ready: {SelectedAsset.FileName}";
         }
@@ -555,6 +672,8 @@ public partial class ShellViewModel(
                     BuildFeatureMask(),
                     EnhancementStrength,
                     BuildManualAdjustments(),
+                    BuildCropStraightenSettings(),
+                    BuildLocalizedMaskSettings(),
                     preset,
                     SelectedStyleProfile?.Id,
                     _exportCancellationSource.Token);
@@ -671,6 +790,30 @@ public partial class ShellViewModel(
 
     private string BuildDefaultStyleProfileName() => $"Style {DateTime.Now:yyyy-MM-dd HHmm}";
 
+    private CropStraightenSettings BuildCropStraightenSettings() => new(
+        RotationDegrees: StraightenAngle,
+        Zoom: CropZoom,
+        OffsetX: CropOffsetX,
+        OffsetY: CropOffsetY);
+
+    public void MoveCropCenterFromCanvas(double normalizedX, double normalizedY)
+    {
+        var zoom = Math.Clamp(CropZoom, 0.0, 0.65);
+        if (zoom <= 0.0001)
+        {
+            return;
+        }
+
+        var maxOffsetFactor = zoom / 2.0;
+        CropOffsetX = Math.Clamp((normalizedX - 0.5) / maxOffsetFactor, -1.0, 1.0);
+        CropOffsetY = Math.Clamp((normalizedY - 0.5) / maxOffsetFactor, -1.0, 1.0);
+    }
+
+    public void AdjustCropZoom(double delta)
+    {
+        CropZoom = Math.Clamp(CropZoom + delta, 0.0, 0.65);
+    }
+
     private ManualEnhancementAdjustments BuildManualAdjustments() => new(
         Exposure: ManualExposure,
         Contrast: ManualContrast,
@@ -682,6 +825,41 @@ public partial class ShellViewModel(
         SkinSoftening: ManualSkinSoftening,
         Denoise: ManualDenoise,
         Sharpen: ManualSharpen);
+
+    private LocalizedMaskSettings BuildLocalizedMaskSettings() => new(
+        IsEnabled: LocalizedMaskEnabled,
+        Kind: SelectedLocalizedMaskKind,
+        CenterX: LocalizedMaskCenterX,
+        CenterY: LocalizedMaskCenterY,
+        Width: LocalizedMaskWidth,
+        Height: LocalizedMaskHeight,
+        Feather: LocalizedMaskFeather,
+        AngleDegrees: LocalizedMaskAngle,
+        Invert: InvertLocalizedMask,
+        Intensity: LocalizedMaskIntensity,
+        Adjustments: new ManualEnhancementAdjustments(
+            Exposure: LocalizedExposure,
+            Contrast: LocalizedContrast,
+            Warmth: LocalizedWarmth,
+            Saturation: LocalizedSaturation,
+            Vibrance: LocalizedVibrance,
+            HighlightRecovery: 0,
+            ShadowLift: 0,
+            SkinSoftening: LocalizedSkinSoftening,
+            Denoise: LocalizedDenoise,
+            Sharpen: LocalizedSharpen));
+
+    public void MoveLocalizedMaskCenterFromCanvas(double normalizedX, double normalizedY)
+    {
+        LocalizedMaskCenterX = Math.Clamp(normalizedX, 0.0, 1.0);
+        LocalizedMaskCenterY = Math.Clamp(normalizedY, 0.0, 1.0);
+    }
+
+    public void AdjustLocalizedMaskSize(double delta)
+    {
+        LocalizedMaskWidth = Math.Clamp(LocalizedMaskWidth + delta, 0.15, 1.0);
+        LocalizedMaskHeight = Math.Clamp(LocalizedMaskHeight + delta, 0.15, 1.0);
+    }
 
     private void ApplyPresetToEditor(SavedPreset preset)
     {
@@ -707,6 +885,28 @@ public partial class ShellViewModel(
         ManualSkinSoftening = preset.ManualAdjustments.SkinSoftening;
         ManualDenoise = preset.ManualAdjustments.Denoise;
         ManualSharpen = preset.ManualAdjustments.Sharpen;
+        StraightenAngle = preset.CropStraighten.RotationDegrees;
+        CropZoom = preset.CropStraighten.Zoom;
+        CropOffsetX = preset.CropStraighten.OffsetX;
+        CropOffsetY = preset.CropStraighten.OffsetY;
+        LocalizedMaskEnabled = preset.LocalizedMask.IsEnabled;
+        SelectedLocalizedMaskKind = preset.LocalizedMask.Kind;
+        LocalizedMaskCenterX = preset.LocalizedMask.CenterX;
+        LocalizedMaskCenterY = preset.LocalizedMask.CenterY;
+        LocalizedMaskWidth = preset.LocalizedMask.Width;
+        LocalizedMaskHeight = preset.LocalizedMask.Height;
+        LocalizedMaskFeather = preset.LocalizedMask.Feather;
+        LocalizedMaskAngle = preset.LocalizedMask.AngleDegrees;
+        InvertLocalizedMask = preset.LocalizedMask.Invert;
+        LocalizedMaskIntensity = preset.LocalizedMask.Intensity;
+        LocalizedExposure = preset.LocalizedMask.Adjustments.Exposure;
+        LocalizedContrast = preset.LocalizedMask.Adjustments.Contrast;
+        LocalizedWarmth = preset.LocalizedMask.Adjustments.Warmth;
+        LocalizedSaturation = preset.LocalizedMask.Adjustments.Saturation;
+        LocalizedVibrance = preset.LocalizedMask.Adjustments.Vibrance;
+        LocalizedSkinSoftening = preset.LocalizedMask.Adjustments.SkinSoftening;
+        LocalizedDenoise = preset.LocalizedMask.Adjustments.Denoise;
+        LocalizedSharpen = preset.LocalizedMask.Adjustments.Sharpen;
 
         _suppressPreviewRefresh = false;
     }
@@ -731,6 +931,28 @@ public partial class ShellViewModel(
     partial void OnManualSkinSofteningChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualDenoiseChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualSharpenChanged(double value) => TriggerPreviewRefresh();
+    partial void OnStraightenAngleChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropZoomChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropOffsetXChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropOffsetYChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskEnabledChanged(bool value) => TriggerPreviewRefresh();
+    partial void OnSelectedLocalizedMaskKindChanged(LocalizedMaskKind value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskCenterXChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskCenterYChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskWidthChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskHeightChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskFeatherChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskAngleChanged(double value) => TriggerPreviewRefresh();
+    partial void OnInvertLocalizedMaskChanged(bool value) => TriggerPreviewRefresh();
+    partial void OnLocalizedMaskIntensityChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedExposureChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedContrastChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedWarmthChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedSaturationChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedVibranceChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedSkinSofteningChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedDenoiseChanged(double value) => TriggerPreviewRefresh();
+    partial void OnLocalizedSharpenChanged(double value) => TriggerPreviewRefresh();
 
     private void TriggerPreviewRefresh()
     {

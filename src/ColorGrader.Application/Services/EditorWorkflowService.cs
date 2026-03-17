@@ -62,18 +62,20 @@ public sealed class EditorWorkflowService(
         EnhancementFeature enabledFeatures,
         double strength,
         ManualEnhancementAdjustments manualAdjustments,
+        CropStraightenSettings cropStraighten,
+        LocalizedMaskSettings localizedMask,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
         var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, styleProfileId, cancellationToken);
-        var originalPreview = await imageProcessingService.LoadPreviewAsync(asset.FilePath, cancellationToken);
+        var originalPreview = await imageProcessingService.LoadPreviewAsync(asset.FilePath, cropStraighten, cancellationToken);
 
         ImagePreview? enhancedPreview = null;
         var notice = string.Empty;
 
         if (imageProcessingService.CanRender(asset.FilePath))
         {
-            enhancedPreview = await imageProcessingService.RenderPreviewAsync(asset.FilePath, suggestion, cancellationToken);
+            enhancedPreview = await imageProcessingService.RenderPreviewAsync(asset.FilePath, suggestion, cropStraighten, localizedMask, cancellationToken);
         }
 
         if (originalPreview is null)
@@ -91,7 +93,7 @@ public sealed class EditorWorkflowService(
             notice = "Preview loaded, but enhancement rendering was unavailable for this file.";
         }
 
-        return new EditorDocument(asset, originalPreview, enhancedPreview, suggestion, notice);
+        return new EditorDocument(asset, originalPreview, enhancedPreview, suggestion, notice, imageProcessingService.InferenceStatusSummary);
     }
 
     public async Task<ExportResult> ExportAssetAsync(
@@ -99,12 +101,14 @@ public sealed class EditorWorkflowService(
         EnhancementFeature enabledFeatures,
         double strength,
         ManualEnhancementAdjustments manualAdjustments,
+        CropStraightenSettings cropStraighten,
+        LocalizedMaskSettings localizedMask,
         ExportPreset preset,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
         var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, styleProfileId, cancellationToken);
-        var request = new ExportRequest(asset, suggestion, preset);
+        var request = new ExportRequest(asset, suggestion, preset, cropStraighten, localizedMask);
         var result = await imageProcessingService.ExportAsync(request, cancellationToken);
 
         await catalogService.SaveExportHistoryAsync(

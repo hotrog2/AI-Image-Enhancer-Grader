@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using ColorGrader.AI.Services;
 using ColorGrader.App.Services;
@@ -26,6 +27,12 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IThumbnailCacheService, ThumbnailCacheService>();
                 services.AddSingleton<WicRawDecoder>();
                 services.AddSingleton<LibRawRawDecoder>();
+                services.AddSingleton(serviceProvider =>
+                {
+                    var paths = serviceProvider.GetRequiredService<AppDataPaths>();
+                    return new SubjectMaskInferenceOptions(Path.Combine(paths.ModelsFolder, "subject-mask.onnx"));
+                });
+                services.AddSingleton<ISubjectMaskInferenceService, OnnxDirectMlSubjectMaskInferenceService>();
                 services.AddSingleton<IRawDecoder>(serviceProvider => new CompositeRawDecoder(
                     [
                         serviceProvider.GetRequiredService<WicRawDecoder>(),

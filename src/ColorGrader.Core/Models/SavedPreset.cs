@@ -6,4 +6,6 @@ public sealed record SavedPreset(
     EnhancementFeature FeatureMask,
     double Strength,
     ManualEnhancementAdjustments ManualAdjustments,
+    CropStraightenSettings CropStraighten,
+    LocalizedMaskSettings LocalizedMask,
     DateTimeOffset CreatedAt);

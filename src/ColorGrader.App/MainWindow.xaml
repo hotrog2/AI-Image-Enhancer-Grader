@@ -222,8 +222,39 @@
                                     BorderBrush="{StaticResource PanelBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="18">
-                                <Grid>
-                                    <Image Source="{Binding EnhancedPreview}" Stretch="Uniform" />
+                                <Grid x:Name="EnhancedPreviewHost"
+                                      SizeChanged="EnhancedPreviewHost_OnSizeChanged"
+                                      PreviewMouseLeftButtonDown="EnhancedPreviewHost_OnPreviewMouseLeftButtonDown"
+                                      PreviewMouseLeftButtonUp="EnhancedPreviewHost_OnPreviewMouseLeftButtonUp"
+                                      PreviewMouseMove="EnhancedPreviewHost_OnPreviewMouseMove"
+                                      PreviewMouseWheel="EnhancedPreviewHost_OnPreviewMouseWheel">
+                                    <Image x:Name="EnhancedPreviewImage" Source="{Binding EnhancedPreview}" Stretch="Uniform" />
+                                    <Canvas x:Name="EnhancedOverlayCanvas"
+                                            IsHitTestVisible="False">
+                                        <Rectangle x:Name="CropOverlayRectangle"
+                                                   Stroke="#FFE8C76A"
+                                                   StrokeThickness="2"
+                                                   RadiusX="8"
+                                                   RadiusY="8"
+                                                   Visibility="Collapsed" />
+                                        <Ellipse x:Name="LocalizedMaskEllipse"
+                                                 Stroke="#FF6AD7B3"
+                                                 StrokeThickness="2"
+                                                 StrokeDashArray="4,3"
+                                                 Visibility="Collapsed" />
+                                        <Line x:Name="LocalizedMaskLine"
+                                              Stroke="#FF6AD7B3"
+                                              StrokeThickness="3"
+                                              StrokeDashArray="6,4"
+                                              Visibility="Collapsed" />
+                                        <Ellipse x:Name="LocalizedMaskCenterHandle"
+                                                 Width="12"
+                                                 Height="12"
+                                                 Fill="#FF6AD7B3"
+                                                 Stroke="#FF0E1B20"
+                                                 StrokeThickness="1"
+                                                 Visibility="Collapsed" />
+                                    </Canvas>
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Foreground="{StaticResource TextMutedBrush}"
@@ -244,6 +275,11 @@
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding PreviewNotice}" TextWrapping="Wrap" />
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Text="{Binding ConfidenceText}" />
                             <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" Text="{Binding SuggestionRationale}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Text="AI Mask Backend" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Text="{Binding InferenceStatusText}"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -424,6 +460,137 @@
                                 <TextBlock Margin="0,10,0,0" Text="Sharpen" />
                                 <Slider Minimum="0" Maximum="0.4" Value="{Binding ManualSharpen}" />
                                 <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualSharpen, StringFormat={}{0:0.00}}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <TextBlock DockPanel.Dock="Left" FontSize="16" FontWeight="SemiBold" Text="Crop &amp; Straighten" />
+                                    <Button HorizontalAlignment="Right"
+                                            Command="{Binding ResetCropStraightenCommand}"
+                                            Content="Reset"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </DockPanel>
+
+                                <TextBlock Text="Straighten" />
+                                <Slider Minimum="-15" Maximum="15" Value="{Binding StraightenAngle}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding StraightenAngle, StringFormat={}{0:+0.0;-0.0;0.0}°}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Crop Zoom" />
+                                <Slider Minimum="0" Maximum="0.65" Value="{Binding CropZoom}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding CropZoom, StringFormat=Zoom {0:P0}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Horizontal Offset" />
+                                <Slider Minimum="-1" Maximum="1" Value="{Binding CropOffsetX}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding CropOffsetX, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Vertical Offset" />
+                                <Slider Minimum="-1" Maximum="1" Value="{Binding CropOffsetY}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding CropOffsetY, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,14,0,0" Text="Canvas Drag Tool" />
+                                <ComboBox Margin="0,6,0,0"
+                                          ItemsSource="{Binding CanvasEditorTools}"
+                                          SelectedItem="{Binding SelectedCanvasEditorTool}" />
+                                <TextBlock Margin="0,6,0,0"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Text="Use the Enhanced preview tab: drag to reposition the selected tool and use the mouse wheel to change crop zoom or mask size."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <TextBlock DockPanel.Dock="Left" FontSize="16" FontWeight="SemiBold" Text="Localized Mask" />
+                                    <Button HorizontalAlignment="Right"
+                                            Command="{Binding ResetLocalizedMaskCommand}"
+                                            Content="Reset"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </DockPanel>
+
+                                <CheckBox IsChecked="{Binding LocalizedMaskEnabled}" Content="Enable localized mask" />
+
+                                <TextBlock Margin="0,12,0,6" Text="Mask Type" />
+                                <ComboBox ItemsSource="{Binding LocalizedMaskKinds}"
+                                          SelectedItem="{Binding SelectedLocalizedMaskKind}" />
+
+                                <CheckBox Margin="0,10,0,0"
+                                          IsChecked="{Binding InvertLocalizedMask}"
+                                          Content="Invert mask" />
+
+                                <TextBlock Margin="0,12,0,0" Text="Center X" />
+                                <Slider Minimum="0" Maximum="1" Value="{Binding LocalizedMaskCenterX}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskCenterX, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Center Y" />
+                                <Slider Minimum="0" Maximum="1" Value="{Binding LocalizedMaskCenterY}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskCenterY, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Width" />
+                                <Slider Minimum="0.15" Maximum="1" Value="{Binding LocalizedMaskWidth}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskWidth, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Height" />
+                                <Slider Minimum="0.15" Maximum="1" Value="{Binding LocalizedMaskHeight}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskHeight, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Feather" />
+                                <Slider Minimum="0.02" Maximum="0.95" Value="{Binding LocalizedMaskFeather}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskFeather, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Angle" />
+                                <Slider Minimum="-180" Maximum="180" Value="{Binding LocalizedMaskAngle}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskAngle, StringFormat={}{0:+0;-0;0}°}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Intensity" />
+                                <Slider Minimum="0" Maximum="1" Value="{Binding LocalizedMaskIntensity}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedMaskIntensity, StringFormat={}{0:P0}}" />
+
+                                <TextBlock Margin="0,14,0,0" FontWeight="SemiBold" Text="Mask Adjustments" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Exposure" />
+                                <Slider Minimum="-0.5" Maximum="0.8" Value="{Binding LocalizedExposure}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedExposure, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Contrast" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding LocalizedContrast}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedContrast, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Warmth" />
+                                <Slider Minimum="-0.2" Maximum="0.2" Value="{Binding LocalizedWarmth}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedWarmth, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Saturation" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding LocalizedSaturation}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedSaturation, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Vibrance" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding LocalizedVibrance}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedVibrance, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Skin Softening" />
+                                <Slider Minimum="0" Maximum="0.5" Value="{Binding LocalizedSkinSoftening}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedSkinSoftening, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Denoise" />
+                                <Slider Minimum="0" Maximum="0.5" Value="{Binding LocalizedDenoise}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedDenoise, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Sharpen" />
+                                <Slider Minimum="0" Maximum="0.5" Value="{Binding LocalizedSharpen}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding LocalizedSharpen, StringFormat={}{0:0.00}}" />
                             </StackPanel>
                         </Border>
 
