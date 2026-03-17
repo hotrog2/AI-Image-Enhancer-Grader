@@ -19,6 +19,8 @@ public sealed class PreferenceStyleLearningServiceTests
             new CatalogAsset(Guid.NewGuid(), Guid.NewGuid(), @"C:\photo.jpg", "photo.jpg", ".jpg", AssetKind.Jpeg, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 10, true, null, null),
             EnhancementFeature.AutoExposure | EnhancementFeature.StyleLearning,
             analysis: null,
+            retryMode: RetryMode.Auto,
+            retryVariantIndex: 0,
             styleProfileId: 7,
             CancellationToken.None);
 
@@ -39,6 +41,8 @@ public sealed class PreferenceStyleLearningServiceTests
             EnhancementFeature.ToneCurve |
             EnhancementFeature.QualityRestore,
             new ImageAnalysis(0.24, 0.16, -0.03),
+            retryMode: RetryMode.Auto,
+            retryVariantIndex: 0,
             styleProfileId: null,
             CancellationToken.None);
 
@@ -46,6 +50,60 @@ public sealed class PreferenceStyleLearningServiceTests
         Assert.True(suggestion.Settings.Warmth >= 0.05);
         Assert.True(suggestion.Settings.Vibrance >= 0.20);
         Assert.True(suggestion.Settings.DetailRecovery >= 0.24);
+    }
+
+    [Fact]
+    public async Task BuildSuggestionAsync_UsesDeclinedFeedbackToGenerateAlternateRetryPass()
+    {
+        var service = new PreferenceStyleLearningService(new FakeCatalogService(
+        [
+            new EnhancementFeedback(Guid.NewGuid(), FeedbackDisposition.Declined, EnhancementSettings.Default, DateTimeOffset.UtcNow)
+        ]));
+
+        var suggestion = await service.BuildSuggestionAsync(
+            new CatalogAsset(Guid.NewGuid(), Guid.NewGuid(), @"C:\photo.jpg", "photo.jpg", ".jpg", AssetKind.Jpeg, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 10, true, null, null),
+            EnhancementFeature.AutoExposure |
+            EnhancementFeature.Contrast |
+            EnhancementFeature.WhiteBalance |
+            EnhancementFeature.ToneCurve |
+            EnhancementFeature.Denoise |
+            EnhancementFeature.Sharpen |
+            EnhancementFeature.QualityRestore |
+            EnhancementFeature.StyleLearning,
+            analysis: null,
+            retryMode: RetryMode.Auto,
+            retryVariantIndex: 1,
+            styleProfileId: null,
+            CancellationToken.None);
+
+        Assert.Contains("retry", suggestion.Rationale, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(EnhancementSettings.Default.Exposure, suggestion.Settings.Exposure);
+        Assert.NotEqual(EnhancementSettings.Default.DetailRecovery, suggestion.Settings.DetailRecovery);
+    }
+
+    [Fact]
+    public async Task BuildSuggestionAsync_UsesSelectedRetryModeBias()
+    {
+        var service = new PreferenceStyleLearningService(new FakeCatalogService([]));
+
+        var suggestion = await service.BuildSuggestionAsync(
+            new CatalogAsset(Guid.NewGuid(), Guid.NewGuid(), @"C:\photo.jpg", "photo.jpg", ".jpg", AssetKind.Jpeg, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, 10, true, null, null),
+            EnhancementFeature.AutoExposure |
+            EnhancementFeature.Contrast |
+            EnhancementFeature.WhiteBalance |
+            EnhancementFeature.ToneCurve |
+            EnhancementFeature.Denoise |
+            EnhancementFeature.Sharpen |
+            EnhancementFeature.QualityRestore,
+            analysis: null,
+            retryMode: RetryMode.Brighter,
+            retryVariantIndex: 1,
+            styleProfileId: null,
+            CancellationToken.None);
+
+        Assert.Contains("Retry mode: Brighter", suggestion.Rationale, StringComparison.OrdinalIgnoreCase);
+        Assert.True(suggestion.Settings.Exposure > EnhancementSettings.Default.Exposure);
+        Assert.True(suggestion.Settings.ShadowLift > EnhancementSettings.Default.ShadowLift);
     }
 
     private sealed class FakeCatalogService(IReadOnlyList<EnhancementFeedback> feedback) : ICatalogService

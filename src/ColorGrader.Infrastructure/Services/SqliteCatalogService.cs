@@ -265,10 +265,7 @@ public sealed class SqliteCatalogService : ICatalogService
 
         await transaction.CommitAsync(cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(thumbnailPath) && File.Exists(thumbnailPath))
-        {
-            File.Delete(thumbnailPath);
-        }
+        TryDeleteThumbnailFile(thumbnailPath);
     }
 
     public async Task<int> ImportFolderAsync(string folderPath, bool recursive, CancellationToken cancellationToken)
@@ -883,6 +880,25 @@ public sealed class SqliteCatalogService : ICatalogService
         }
 
         return false;
+    }
+
+    private static void TryDeleteThumbnailFile(string? thumbnailPath)
+    {
+        if (string.IsNullOrWhiteSpace(thumbnailPath) || !File.Exists(thumbnailPath))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(thumbnailPath);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static async Task EnsureFeedbackColumnsAsync(SqliteConnection connection, CancellationToken cancellationToken)

@@ -9,6 +9,8 @@ public sealed class PreferenceStyleLearningService(ICatalogService catalogServic
         CatalogAsset asset,
         EnhancementFeature enabledFeatures,
         ImageAnalysis? analysis,
+        RetryMode retryMode,
+        int retryVariantIndex,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
@@ -19,6 +21,10 @@ public sealed class PreferenceStyleLearningService(ICatalogService catalogServic
 
         var accepted = relevantFeedback
             .Where(item => item.Outcome == FeedbackDisposition.Accepted || item.Outcome == FeedbackDisposition.ModifiedAfterAccept)
+            .Take(12)
+            .ToList();
+        var declined = relevantFeedback
+            .Where(item => item.Outcome == FeedbackDisposition.Declined)
             .Take(12)
             .ToList();
 
@@ -32,6 +38,17 @@ public sealed class PreferenceStyleLearningService(ICatalogService catalogServic
         var learnedSettings = !enabledFeatures.HasFlag(EnhancementFeature.StyleLearning) || accepted.Count == 0
             ? baseSettings
             : Blend(baseSettings, Average(accepted.Select(item => item.Settings).ToList()), 0.45);
+
+        if (enabledFeatures.HasFlag(EnhancementFeature.StyleLearning) && declined.Count > 0)
+        {
+            var retryVariant = BuildRetryVariant(baseSettings, declined.Count + retryVariantIndex, retryMode);
+            learnedSettings = Blend(learnedSettings, retryVariant, accepted.Count == 0 ? 0.55 : 0.30);
+        }
+        else if (retryVariantIndex > 0)
+        {
+            learnedSettings = Blend(learnedSettings, BuildRetryVariant(baseSettings, retryVariantIndex, retryMode), 0.60);
+        }
+
         var maskedSettings = learnedSettings.ApplyFeatureMask(enabledFeatures);
 
         var rationale = accepted.Count == 0
@@ -47,9 +64,35 @@ public sealed class PreferenceStyleLearningService(ICatalogService catalogServic
             rationale += " Warm neon portrait bias applied from the provided reference look.";
         }
 
+        if (declined.Count > 0)
+        {
+            rationale += accepted.Count == 0
+                ? " Recent declined edits triggered an alternate retry pass."
+                : " Recent declined edits nudged this pass away from rejected looks.";
+        }
+        else if (retryVariantIndex > 0)
+        {
+            rationale += " Alternate retry variation applied.";
+        }
+
+        if (retryMode != RetryMode.Auto)
+        {
+            rationale += $" Retry mode: {retryMode}.";
+        }
+
+        if (retryVariantIndex > 0)
+        {
+            rationale += $" Retry {retryVariantIndex + 1}.";
+        }
+
         var confidence = accepted.Count == 0
             ? 0.62
             : Math.Min(styleProfileId is null ? 0.90 : 0.93, 0.65 + (accepted.Count * 0.02));
+        if (declined.Count > 0 || retryVariantIndex > 0)
+        {
+            confidence = Math.Max(0.45, confidence - 0.07);
+        }
+
         return new EnhancementSuggestion(enabledFeatures, maskedSettings, rationale, confidence);
     }
 
@@ -120,6 +163,93 @@ public sealed class PreferenceStyleLearningService(ICatalogService catalogServic
             Deblur: 0.26,
             ArtifactReduction: 0.20,
             RealismBoost: 0.18);
+    }
+
+    private static EnhancementSettings BuildRetryVariant(EnhancementSettings baseSettings, int declineCount, RetryMode retryMode)
+    {
+        var modeSettings = retryMode switch
+        {
+            RetryMode.Brighter => baseSettings with
+            {
+                Exposure = Math.Clamp(baseSettings.Exposure + 0.16, -1.0, 1.5),
+                HighlightRecovery = Math.Clamp(baseSettings.HighlightRecovery + 0.06, 0.0, 1.0),
+                ShadowLift = Math.Clamp(baseSettings.ShadowLift + 0.10, -0.5, 1.0),
+                Vibrance = Math.Clamp(baseSettings.Vibrance + 0.04, -0.5, 1.0)
+            },
+            RetryMode.Cleaner => baseSettings with
+            {
+                Denoise = Math.Clamp(baseSettings.Denoise + 0.14, 0.0, 1.0),
+                SkinSoftening = Math.Clamp(baseSettings.SkinSoftening + 0.04, 0.0, 1.0),
+                DetailRecovery = Math.Clamp(baseSettings.DetailRecovery + 0.12, 0.0, 1.0),
+                ArtifactReduction = Math.Clamp(baseSettings.ArtifactReduction + 0.12, 0.0, 1.0),
+                RealismBoost = Math.Clamp(baseSettings.RealismBoost + 0.06, 0.0, 1.0)
+            },
+            RetryMode.Warmer => baseSettings with
+            {
+                Warmth = Math.Clamp(baseSettings.Warmth + 0.12, -0.35, 0.35),
+                Saturation = Math.Clamp(baseSettings.Saturation + 0.05, -0.5, 1.0),
+                Vibrance = Math.Clamp(baseSettings.Vibrance + 0.08, -0.5, 1.0),
+                HighlightRecovery = Math.Clamp(baseSettings.HighlightRecovery + 0.04, 0.0, 1.0)
+            },
+            RetryMode.Sharper => baseSettings with
+            {
+                Contrast = Math.Clamp(baseSettings.Contrast + 0.10, -0.5, 1.0),
+                Sharpen = Math.Clamp(baseSettings.Sharpen + 0.16, 0.0, 1.0),
+                DetailRecovery = Math.Clamp(baseSettings.DetailRecovery + 0.16, 0.0, 1.0),
+                Deblur = Math.Clamp(baseSettings.Deblur + 0.14, 0.0, 1.0),
+                RealismBoost = Math.Clamp(baseSettings.RealismBoost + 0.08, 0.0, 1.0)
+            },
+            _ => baseSettings
+        };
+
+        return ((Math.Max(1, declineCount) - 1) % 3) switch
+        {
+            0 => modeSettings with
+            {
+                Exposure = Math.Clamp(modeSettings.Exposure - 0.08, -1.0, 1.5),
+                Contrast = Math.Clamp(modeSettings.Contrast + 0.08, -0.5, 1.0),
+                Warmth = Math.Clamp(modeSettings.Warmth - 0.05, -0.35, 0.35),
+                Saturation = Math.Clamp(modeSettings.Saturation - 0.03, -0.5, 1.0),
+                Vibrance = Math.Clamp(modeSettings.Vibrance + 0.05, -0.5, 1.0),
+                ShadowLift = Math.Clamp(modeSettings.ShadowLift - 0.04, -0.5, 1.0),
+                Denoise = Math.Clamp(modeSettings.Denoise + 0.06, 0.0, 1.0),
+                Sharpen = Math.Clamp(modeSettings.Sharpen + 0.08, 0.0, 1.0),
+                DetailRecovery = Math.Clamp(modeSettings.DetailRecovery + 0.10, 0.0, 1.0),
+                Deblur = Math.Clamp(modeSettings.Deblur + 0.08, 0.0, 1.0),
+                ArtifactReduction = Math.Clamp(modeSettings.ArtifactReduction + 0.06, 0.0, 1.0),
+                RealismBoost = Math.Clamp(modeSettings.RealismBoost + 0.06, 0.0, 1.0)
+            },
+            1 => modeSettings with
+            {
+                Exposure = Math.Clamp(modeSettings.Exposure + 0.10, -1.0, 1.5),
+                Contrast = Math.Clamp(modeSettings.Contrast - 0.05, -0.5, 1.0),
+                Warmth = Math.Clamp(modeSettings.Warmth + 0.06, -0.35, 0.35),
+                Saturation = Math.Clamp(modeSettings.Saturation + 0.04, -0.5, 1.0),
+                Vibrance = Math.Clamp(modeSettings.Vibrance + 0.08, -0.5, 1.0),
+                HighlightRecovery = Math.Clamp(modeSettings.HighlightRecovery + 0.06, 0.0, 1.0),
+                ShadowLift = Math.Clamp(modeSettings.ShadowLift + 0.05, -0.5, 1.0),
+                SkinSoftening = Math.Clamp(modeSettings.SkinSoftening + 0.03, 0.0, 1.0),
+                Denoise = Math.Clamp(modeSettings.Denoise + 0.04, 0.0, 1.0),
+                DetailRecovery = Math.Clamp(modeSettings.DetailRecovery + 0.07, 0.0, 1.0),
+                Deblur = Math.Clamp(modeSettings.Deblur + 0.05, 0.0, 1.0),
+                RealismBoost = Math.Clamp(modeSettings.RealismBoost + 0.08, 0.0, 1.0)
+            },
+            _ => modeSettings with
+            {
+                Exposure = Math.Clamp(modeSettings.Exposure + 0.03, -1.0, 1.5),
+                Contrast = Math.Clamp(modeSettings.Contrast + 0.10, -0.5, 1.0),
+                Warmth = Math.Clamp(modeSettings.Warmth + 0.09, -0.35, 0.35),
+                Saturation = Math.Clamp(modeSettings.Saturation + 0.08, -0.5, 1.0),
+                Vibrance = Math.Clamp(modeSettings.Vibrance + 0.10, -0.5, 1.0),
+                HighlightRecovery = Math.Clamp(modeSettings.HighlightRecovery + 0.08, 0.0, 1.0),
+                Denoise = Math.Clamp(modeSettings.Denoise + 0.02, 0.0, 1.0),
+                Sharpen = Math.Clamp(modeSettings.Sharpen + 0.05, 0.0, 1.0),
+                DetailRecovery = Math.Clamp(modeSettings.DetailRecovery + 0.06, 0.0, 1.0),
+                Deblur = Math.Clamp(modeSettings.Deblur + 0.05, 0.0, 1.0),
+                ArtifactReduction = Math.Clamp(modeSettings.ArtifactReduction + 0.04, 0.0, 1.0),
+                RealismBoost = Math.Clamp(modeSettings.RealismBoost + 0.10, 0.0, 1.0)
+            }
+        };
     }
 
     private static EnhancementSettings Average(IReadOnlyList<EnhancementSettings> values)

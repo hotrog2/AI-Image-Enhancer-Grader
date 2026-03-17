@@ -15,6 +15,7 @@ public partial class ShellViewModel(
     IFolderPickerService folderPickerService) : ObservableObject
 {
     private const string NeonClubReferencePresetName = "Reference Look - Neon Club Glow";
+    private readonly Dictionary<Guid, int> _retryVariantCounts = [];
     private CancellationTokenSource? _editorCancellationSource;
     private CancellationTokenSource? _exportCancellationSource;
     private bool _suppressPreviewRefresh;
@@ -29,6 +30,7 @@ public partial class ShellViewModel(
     public IReadOnlyList<EditorCompareMode> CompareModes { get; } = Enum.GetValues<EditorCompareMode>();
     public IReadOnlyList<LocalizedMaskKind> LocalizedMaskKinds { get; } = Enum.GetValues<LocalizedMaskKind>();
     public IReadOnlyList<CanvasEditorTool> CanvasEditorTools { get; } = Enum.GetValues<CanvasEditorTool>();
+    public IReadOnlyList<RetryMode> RetryModes { get; } = Enum.GetValues<RetryMode>();
 
     [ObservableProperty]
     private CatalogAssetListItem? selectedLibraryItem;
@@ -95,6 +97,9 @@ public partial class ShellViewModel(
 
     [ObservableProperty]
     private EditorCompareMode selectedCompareMode = EditorCompareMode.Compare;
+
+    [ObservableProperty]
+    private RetryMode selectedRetryMode = RetryMode.Auto;
 
     [ObservableProperty]
     private bool autoExposure = true;
@@ -351,6 +356,10 @@ public partial class ShellViewModel(
             await RefreshLibraryAsync();
             StatusText = $"Removed \"{deletedFileName}\" from the library.";
         }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not remove \"{deletedFileName}\" from the library: {ex.Message}";
+        }
         finally
         {
             IsBusy = false;
@@ -360,7 +369,36 @@ public partial class ShellViewModel(
     private bool CanDeleteSelectedAsset() => SelectedAsset is not null;
 
     [RelayCommand]
-    private Task EnhanceAsync() => LoadSelectedAssetAsync();
+    private Task EnhanceAsync()
+    {
+        if (SelectedAsset is not null)
+        {
+            _retryVariantCounts.Remove(SelectedAsset.Id);
+        }
+
+        SelectedRetryMode = RetryMode.Auto;
+        return LoadSelectedAssetAsync();
+    }
+
+    [RelayCommand]
+    private async Task RetryAsync(string? retryModeName)
+    {
+        if (SelectedAsset is null)
+        {
+            StatusText = "Choose a photo first if you want to retry the enhancement.";
+            return;
+        }
+
+        if (!Enum.TryParse<RetryMode>(retryModeName, ignoreCase: true, out var retryMode))
+        {
+            retryMode = SelectedRetryMode;
+        }
+
+        SelectedRetryMode = retryMode;
+        _retryVariantCounts[SelectedAsset.Id] = GetRetryVariantIndex(SelectedAsset.Id) + 1;
+        await LoadSelectedAssetAsync();
+        StatusText = $"Generated {retryMode.ToString().ToLowerInvariant()} retry for \"{SelectedAsset.FileName}\".";
+    }
 
     [RelayCommand]
     private void ResetFineTune()
@@ -545,6 +583,8 @@ public partial class ShellViewModel(
             SelectedStyleProfile?.Id,
             CancellationToken.None);
 
+        _retryVariantCounts.Remove(SelectedAsset.Id);
+
         await LoadStyleProfilesAsync(SelectedStyleProfile?.Name);
         StatusText = SelectedStyleProfile is null
             ? "Saved this enhancement as an accepted catalog style example."
@@ -566,10 +606,12 @@ public partial class ShellViewModel(
             SelectedStyleProfile?.Id,
             CancellationToken.None);
 
+        _retryVariantCounts[SelectedAsset.Id] = GetRetryVariantIndex(SelectedAsset.Id) + 1;
         await LoadStyleProfilesAsync(SelectedStyleProfile?.Name);
+        await LoadSelectedAssetAsync();
         StatusText = SelectedStyleProfile is null
-            ? "Saved this enhancement as a declined catalog style example."
-            : $"Saved this enhancement as a declined example for style profile \"{SelectedStyleProfile.Name}\".";
+            ? "Saved this enhancement as declined and generated another pass."
+            : $"Saved this enhancement as declined for style profile \"{SelectedStyleProfile.Name}\" and generated another pass.";
     }
 
     [RelayCommand]
@@ -621,6 +663,12 @@ public partial class ShellViewModel(
 
     partial void OnSelectedAssetChanged(CatalogAsset? value)
     {
+        if (value is not null)
+        {
+            SelectedRetryMode = RetryMode.Auto;
+            _retryVariantCounts.Remove(value.Id);
+        }
+
         DeleteSelectedAssetCommand.NotifyCanExecuteChanged();
         _ = LoadSelectedAssetAsync();
     }
@@ -668,6 +716,8 @@ public partial class ShellViewModel(
                 BuildManualAdjustments(),
                 BuildCropStraightenSettings(),
                 BuildLocalizedMaskSettings(),
+                SelectedRetryMode,
+                GetRetryVariantIndex(SelectedAsset.Id),
                 SelectedStyleProfile?.Id,
                 _editorCancellationSource.Token);
 
@@ -748,6 +798,8 @@ public partial class ShellViewModel(
                     BuildCropStraightenSettings(),
                     BuildLocalizedMaskSettings(),
                     preset,
+                    SelectedRetryMode,
+                    GetRetryVariantIndex(asset.Id),
                     SelectedStyleProfile?.Id,
                     _exportCancellationSource.Token);
 
@@ -863,6 +915,9 @@ public partial class ShellViewModel(
     private string BuildDefaultPresetName() => $"Preset {DateTime.Now:yyyy-MM-dd HHmm}";
 
     private string BuildDefaultStyleProfileName() => $"Style {DateTime.Now:yyyy-MM-dd HHmm}";
+
+    private int GetRetryVariantIndex(Guid assetId) =>
+        _retryVariantCounts.TryGetValue(assetId, out var retryVariantIndex) ? retryVariantIndex : 0;
 
     private async Task EnsureBuiltInPresetsAsync()
     {

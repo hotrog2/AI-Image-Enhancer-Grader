@@ -8,6 +8,8 @@ public interface IStyleLearningService
         CatalogAsset asset,
         EnhancementFeature enabledFeatures,
         ImageAnalysis? analysis,
+        RetryMode retryMode,
+        int retryVariantIndex,
         long? styleProfileId,
         CancellationToken cancellationToken);
 }

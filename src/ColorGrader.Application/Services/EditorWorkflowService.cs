@@ -67,10 +67,12 @@ public sealed class EditorWorkflowService(
         ManualEnhancementAdjustments manualAdjustments,
         CropStraightenSettings cropStraighten,
         LocalizedMaskSettings localizedMask,
+        RetryMode retryMode,
+        int retryVariantIndex,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
-        var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, styleProfileId, cancellationToken);
+        var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, retryMode, retryVariantIndex, styleProfileId, cancellationToken);
         var originalPreview = await imageProcessingService.LoadPreviewAsync(asset.FilePath, cropStraighten, cancellationToken);
 
         ImagePreview? enhancedPreview = null;
@@ -107,10 +109,12 @@ public sealed class EditorWorkflowService(
         CropStraightenSettings cropStraighten,
         LocalizedMaskSettings localizedMask,
         ExportPreset preset,
+        RetryMode retryMode,
+        int retryVariantIndex,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
-        var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, styleProfileId, cancellationToken);
+        var suggestion = await BuildSuggestionAsync(asset, enabledFeatures, strength, manualAdjustments, retryMode, retryVariantIndex, styleProfileId, cancellationToken);
         var request = new ExportRequest(asset, suggestion, preset, cropStraighten, localizedMask);
         var result = await imageProcessingService.ExportAsync(request, cancellationToken);
 
@@ -150,11 +154,13 @@ public sealed class EditorWorkflowService(
         EnhancementFeature enabledFeatures,
         double strength,
         ManualEnhancementAdjustments manualAdjustments,
+        RetryMode retryMode,
+        int retryVariantIndex,
         long? styleProfileId,
         CancellationToken cancellationToken)
     {
         var analysis = await imageProcessingService.AnalyzeAsync(asset.FilePath, cancellationToken);
-        var suggestion = await styleLearningService.BuildSuggestionAsync(asset, enabledFeatures, analysis, styleProfileId, cancellationToken);
+        var suggestion = await styleLearningService.BuildSuggestionAsync(asset, enabledFeatures, analysis, retryMode, retryVariantIndex, styleProfileId, cancellationToken);
         var appliedSettings = suggestion.Settings
             .ApplyStrength(strength)
             .ApplyManualAdjustments(manualAdjustments);
