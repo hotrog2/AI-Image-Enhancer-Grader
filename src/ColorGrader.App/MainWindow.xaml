@@ -1,0 +1,627 @@
+<Window x:Class="ColorGrader.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Color Grader"
+        Width="1520"
+        Height="920"
+        MinWidth="1280"
+        MinHeight="760"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="20"
+                Margin="0,0,0,18"
+                Background="#1AFFFFFF"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock FontSize="30" FontWeight="SemiBold" Text="Color Grader" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               Text="Offline Windows editor for cataloging, previewing, exporting, and learning your preferred enhancement style." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Width="140"
+                            Margin="0,0,12,0"
+                            Command="{Binding RefreshLibraryCommand}"
+                            Content="Refresh Catalog"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Width="140"
+                            Command="{Binding ImportFolderCommand}"
+                            Content="Import Folder"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="310" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="360" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Margin="0,0,18,0"
+                    Padding="18"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock FontSize="22" FontWeight="SemiBold" Text="Library" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,6,0,14"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               Text="{Binding CatalogSummary}" />
+
+                    <ListBox Grid.Row="2"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ItemsSource="{Binding LibraryItems}"
+                             SelectedItem="{Binding SelectedLibraryItem, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10"
+                                        Padding="12"
+                                        Background="{StaticResource PanelRaisedBrush}"
+                                        BorderBrush="{StaticResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="72"
+                                                Height="72"
+                                                Background="#16000000"
+                                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="12">
+                                            <Image Source="{Binding ThumbnailPath}" Stretch="UniformToFill" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       Text="{Binding Kind}" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       Text="{Binding FilePath}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Margin="0,0,18,0"
+                    Padding="18"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Editor" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="{Binding SelectedAssetSummary}" />
+                    </StackPanel>
+
+                    <TabControl Grid.Row="1" Margin="0,18,0,0">
+                        <TabControl.ItemContainerStyle>
+                            <Style TargetType="TabItem">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                                <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+                                <Setter Property="Padding" Value="12,8" />
+                                <Setter Property="Margin" Value="0,0,8,0" />
+                            </Style>
+                        </TabControl.ItemContainerStyle>
+
+                        <TabItem Header="Compare">
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="18" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Padding="12"
+                                        Background="#12000000"
+                                        BorderBrush="{StaticResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="18">
+                                    <Grid>
+                                        <Image Source="{Binding OriginalPreview}" Stretch="Uniform" />
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Text="Original preview" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Column="2"
+                                        Padding="12"
+                                        Background="#12000000"
+                                        BorderBrush="{StaticResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="18">
+                                    <Grid>
+                                        <Image Source="{Binding EnhancedPreview}" Stretch="Uniform" />
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Text="Enhanced preview" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Original">
+                            <Border Margin="0,12,0,0"
+                                    Padding="12"
+                                    Background="#12000000"
+                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="18">
+                                <Grid>
+                                    <Image Source="{Binding OriginalPreview}" Stretch="Uniform" />
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               Text="Original preview" />
+                                </Grid>
+                            </Border>
+                        </TabItem>
+
+                        <TabItem Header="Enhanced">
+                            <Border Margin="0,12,0,0"
+                                    Padding="12"
+                                    Background="#12000000"
+                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="18">
+                                <Grid>
+                                    <Image Source="{Binding EnhancedPreview}" Stretch="Uniform" />
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               Text="Enhanced preview" />
+                                </Grid>
+                            </Border>
+                        </TabItem>
+                    </TabControl>
+
+                    <Border Grid.Row="2"
+                            Margin="0,18,0,0"
+                            Padding="16"
+                            Background="{StaticResource PanelRaisedBrush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="18">
+                        <StackPanel>
+                            <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding PreviewNotice}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Text="{Binding ConfidenceText}" />
+                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" Text="{Binding SuggestionRationale}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Padding="18"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="22">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="One-Click Enhance" />
+                        <TextBlock Margin="0,6,0,18"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="Pick the features you want included, then render an offline enhancement preview or queue exports." />
+
+                        <Button Margin="0,0,0,12"
+                                Command="{Binding EnhanceCommand}"
+                                Content="Render Enhancement"
+                                Style="{StaticResource PrimaryButtonStyle}" />
+                        <Button Margin="0,0,0,12"
+                                Command="{Binding AcceptCommand}"
+                                Content="Accept Result"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                        <Button Margin="0,0,0,22"
+                                Command="{Binding DeclineCommand}"
+                                Content="Decline Result"
+                                Style="{StaticResource DangerButtonStyle}" />
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,12" FontSize="16" FontWeight="SemiBold" Text="Features" />
+                                <CheckBox IsChecked="{Binding AutoExposure}" Content="Auto exposure" />
+                                <CheckBox IsChecked="{Binding WhiteBalance}" Content="White balance" />
+                                <CheckBox IsChecked="{Binding Contrast}" Content="Contrast shaping" />
+                                <CheckBox IsChecked="{Binding ToneCurve}" Content="Tone curve and color pop" />
+                                <CheckBox IsChecked="{Binding SkinTone}" Content="Skin finish" />
+                                <CheckBox IsChecked="{Binding Denoise}" Content="Denoise" />
+                                <CheckBox IsChecked="{Binding Sharpen}" Content="Sharpen" />
+                                <CheckBox IsChecked="{Binding Upscale}" Content="Upscale preview" />
+                                <CheckBox Margin="0" IsChecked="{Binding StyleLearning}" Content="Blend in accepted style history" />
+
+                                <TextBlock Margin="0,14,0,6" Text="Enhancement Strength" />
+                                <Slider Minimum="0"
+                                        Maximum="1"
+                                        Value="{Binding EnhancementStrength}"
+                                        TickFrequency="0.05" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                           Text="{Binding EnhancementStrength, StringFormat=Strength {0:P0}}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,12" FontSize="16" FontWeight="SemiBold" Text="Style Profiles" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                           Text="Select a profile to train and reuse a specific look. Leave it cleared to learn from overall catalog history." 
+                                           TextWrapping="Wrap" />
+
+                                <TextBlock Margin="0,14,0,0" Text="Profile Name" />
+                                <TextBox Margin="0,6,0,12"
+                                         Text="{Binding NewStyleProfileName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding SaveStyleProfileCommand}"
+                                        Content="Save Profile"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding UseCatalogStyleHistoryCommand}"
+                                        Content="Use Catalog History"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Margin="0,0,0,12"
+                                        Command="{Binding DeleteSelectedStyleProfileCommand}"
+                                        Content="Delete Selected"
+                                        Style="{StaticResource DangerButtonStyle}" />
+
+                                <ListBox Background="Transparent"
+                                         BorderThickness="0"
+                                         ItemsSource="{Binding StyleProfiles}"
+                                         SelectedItem="{Binding SelectedStyleProfile, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10"
+                                                    Background="#12000000"
+                                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="14">
+                                                <StackPanel>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Left"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="{Binding Name}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock HorizontalAlignment="Right"
+                                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                                   Text="{Binding AcceptedCount, StringFormat={}{0} accepted}" />
+                                                    </DockPanel>
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               Text="{Binding DeclinedCount, StringFormat={}{0} declined}"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               Text="{Binding LastFeedbackAt, StringFormat=Last example {0:g}, TargetNullValue=No examples yet}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <TextBlock DockPanel.Dock="Left" FontSize="16" FontWeight="SemiBold" Text="Fine Tune" />
+                                    <Button HorizontalAlignment="Right"
+                                            Command="{Binding ResetFineTuneCommand}"
+                                            Content="Reset"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </DockPanel>
+
+                                <TextBlock Text="Exposure" />
+                                <Slider Minimum="-0.5" Maximum="0.8" Value="{Binding ManualExposure}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualExposure, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Contrast" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding ManualContrast}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualContrast, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Warmth" />
+                                <Slider Minimum="-0.2" Maximum="0.2" Value="{Binding ManualWarmth}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualWarmth, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Saturation" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding ManualSaturation}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualSaturation, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Vibrance" />
+                                <Slider Minimum="-0.3" Maximum="0.5" Value="{Binding ManualVibrance}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualVibrance, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Highlights" />
+                                <Slider Minimum="-0.2" Maximum="0.5" Value="{Binding ManualHighlightRecovery}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualHighlightRecovery, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Shadows" />
+                                <Slider Minimum="-0.2" Maximum="0.5" Value="{Binding ManualShadowLift}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualShadowLift, StringFormat={}{0:+0.00;-0.00;0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Skin Softening" />
+                                <Slider Minimum="0" Maximum="0.4" Value="{Binding ManualSkinSoftening}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualSkinSoftening, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Denoise" />
+                                <Slider Minimum="0" Maximum="0.4" Value="{Binding ManualDenoise}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualDenoise, StringFormat={}{0:0.00}}" />
+
+                                <TextBlock Margin="0,10,0,0" Text="Sharpen" />
+                                <Slider Minimum="0" Maximum="0.4" Value="{Binding ManualSharpen}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding ManualSharpen, StringFormat={}{0:0.00}}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,12" FontSize="16" FontWeight="SemiBold" Text="Saved Presets" />
+
+                                <TextBlock Text="Preset Name" />
+                                <TextBox Margin="0,6,0,12"
+                                         Text="{Binding NewPresetName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding SavePresetCommand}"
+                                        Content="Save Current"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding ApplySelectedPresetCommand}"
+                                        Content="Apply Selected"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Margin="0,0,0,12"
+                                        Command="{Binding DeleteSelectedPresetCommand}"
+                                        Content="Delete Selected"
+                                        Style="{StaticResource DangerButtonStyle}" />
+
+                                <ListBox Background="Transparent"
+                                         BorderThickness="0"
+                                         ItemsSource="{Binding Presets}"
+                                         SelectedItem="{Binding SelectedPreset, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10"
+                                                    Background="#12000000"
+                                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="14">
+                                                <StackPanel>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Left"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="{Binding Name}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock HorizontalAlignment="Right"
+                                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                                   Text="{Binding Strength, StringFormat={}{0:P0}}" />
+                                                    </DockPanel>
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               Text="{Binding FeatureMask}"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               Text="{Binding CreatedAt, StringFormat=Saved {0:g}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16"
+                                Margin="0,0,0,18"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,12" FontSize="16" FontWeight="SemiBold" Text="Batch Export" />
+
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding ChooseExportFolderCommand}"
+                                        Content="Choose Export Folder"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                           Text="{Binding ExportFolder}"
+                                           TextWrapping="Wrap" />
+
+                                <TextBlock Margin="0,16,0,6" Text="Format" />
+                                <ComboBox ItemsSource="{Binding ExportFormats}"
+                                          SelectedItem="{Binding SelectedExportFormat}" />
+
+                                <TextBlock Margin="0,12,0,6" Text="Long Edge Pixels" />
+                                <TextBox Text="{Binding ExportLongEdgePixels, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,6" Text="JPEG Quality" />
+                                <TextBox Text="{Binding JpegQuality, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <Button Margin="0,16,0,10"
+                                        Command="{Binding ExportSelectedCommand}"
+                                        Content="Export Selected"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Margin="0,0,0,10"
+                                        Command="{Binding ExportAllCommand}"
+                                        Content="Export Entire Catalog"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                                <Button Command="{Binding CancelExportsCommand}"
+                                        Content="Cancel Exports"
+                                        Style="{StaticResource DangerButtonStyle}" />
+
+                                <TextBlock Margin="0,14,0,10"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           Text="{Binding ExportProgressText}" />
+
+                                 <ListBox Background="Transparent"
+                                          BorderThickness="0"
+                                          ItemsSource="{Binding ExportQueueItems}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10"
+                                                    Background="#12000000"
+                                                    BorderBrush="{StaticResource PanelBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="14">
+                                                <StackPanel>
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" Text="{Binding Status}" />
+                                                    <TextBlock Margin="0,4,0,0"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               Text="{Binding Detail}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                 </ListBox>
+
+                                 <TextBlock Margin="0,16,0,10" FontSize="16" FontWeight="SemiBold" Text="Recent Exports" />
+                                 <ListBox Background="Transparent"
+                                          BorderThickness="0"
+                                          ItemsSource="{Binding RecentExports}">
+                                     <ListBox.ItemTemplate>
+                                         <DataTemplate>
+                                             <Border Margin="0,0,0,8"
+                                                     Padding="10"
+                                                     Background="#12000000"
+                                                     BorderBrush="{StaticResource PanelBorderBrush}"
+                                                     BorderThickness="1"
+                                                     CornerRadius="14">
+                                                 <StackPanel>
+                                                     <DockPanel>
+                                                         <TextBlock DockPanel.Dock="Left" FontWeight="SemiBold" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+                                                         <TextBlock HorizontalAlignment="Right"
+                                                                    Foreground="{StaticResource TextMutedBrush}"
+                                                                    Text="{Binding TimestampText}" />
+                                                     </DockPanel>
+                                                     <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" Text="{Binding Status}" />
+                                                     <TextBlock Margin="0,4,0,0"
+                                                                FontSize="11"
+                                                                Foreground="{StaticResource TextMutedBrush}"
+                                                                Text="{Binding Detail}"
+                                                                TextWrapping="Wrap" />
+                                                 </StackPanel>
+                                             </Border>
+                                         </DataTemplate>
+                                     </ListBox.ItemTemplate>
+                                 </ListBox>
+                             </StackPanel>
+                         </Border>
+
+                        <Border Padding="16"
+                                Background="{StaticResource PanelRaisedBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="18">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,8" FontSize="16" FontWeight="SemiBold" Text="Status" />
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" Text="{Binding StatusText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Margin="0,18,0,0"
+                Padding="14,10"
+                Background="#12000000"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="16">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left"
+                           FontWeight="SemiBold"
+                           Text="Local-first | Offline | Windows" />
+                <TextBlock HorizontalAlignment="Right"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           Text="AMD-friendly architecture: deterministic grading now, export queue live, RAW proxy fallback in place." />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

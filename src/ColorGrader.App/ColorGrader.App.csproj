@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ColorGrader.Core\ColorGrader.Core.csproj" />
+    <ProjectReference Include="..\ColorGrader.Application\ColorGrader.Application.csproj" />
+    <ProjectReference Include="..\ColorGrader.Infrastructure\ColorGrader.Infrastructure.csproj" />
+    <ProjectReference Include="..\ColorGrader.Imaging\ColorGrader.Imaging.csproj" />
+    <ProjectReference Include="..\ColorGrader.AI\ColorGrader.AI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>
