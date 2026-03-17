@@ -325,6 +325,40 @@ public partial class ShellViewModel(
         }
     }
 
+    [RelayCommand(CanExecute = nameof(CanDeleteSelectedAsset))]
+    private async Task DeleteSelectedAssetAsync()
+    {
+        if (SelectedAsset is null)
+        {
+            StatusText = "Choose a photo first if you want to remove it from the library.";
+            return;
+        }
+
+        var deletedFileName = SelectedAsset.FileName;
+        var deletedAssetId = SelectedAsset.Id;
+
+        IsBusy = true;
+        StatusText = $"Removing {deletedFileName} from the library...";
+
+        try
+        {
+            _editorCancellationSource?.Cancel();
+            SelectedLibraryItem = null;
+            SelectedAsset = null;
+            ClearEditorState();
+
+            await workflowService.DeleteAssetAsync(deletedAssetId, CancellationToken.None);
+            await RefreshLibraryAsync();
+            StatusText = $"Removed \"{deletedFileName}\" from the library.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanDeleteSelectedAsset() => SelectedAsset is not null;
+
     [RelayCommand]
     private Task EnhanceAsync() => LoadSelectedAssetAsync();
 
@@ -587,6 +621,7 @@ public partial class ShellViewModel(
 
     partial void OnSelectedAssetChanged(CatalogAsset? value)
     {
+        DeleteSelectedAssetCommand.NotifyCanExecuteChanged();
         _ = LoadSelectedAssetAsync();
     }
 
@@ -612,6 +647,7 @@ public partial class ShellViewModel(
     {
         if (SelectedAsset is null)
         {
+            ClearEditorState();
             return;
         }
 
@@ -653,6 +689,18 @@ public partial class ShellViewModel(
         {
             IsBusy = false;
         }
+    }
+
+    private void ClearEditorState()
+    {
+        OriginalPreview = null;
+        EnhancedPreview = null;
+        PreviewNotice = "No asset selected.";
+        SuggestionRationale = "Enhancement suggestions show up here after you pick an image.";
+        ConfidenceText = "Confidence --";
+        SelectedAssetSummary = "Choose a photo from the library";
+        InferenceStatusText = "Load a photo to see preview and AI backend status.";
+        CurrentSuggestion = null;
     }
 
     private async Task RunExportQueueAsync(IReadOnlyList<CatalogAsset> assetsToExport)

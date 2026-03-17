@@ -7,6 +7,7 @@ public interface ICatalogService
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<CatalogFolder>> GetFoldersAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<CatalogAsset>> GetAssetsAsync(CancellationToken cancellationToken);
+    Task DeleteAssetAsync(Guid assetId, CancellationToken cancellationToken);
     Task<int> ImportFolderAsync(string folderPath, bool recursive, CancellationToken cancellationToken);
     Task SaveFeedbackAsync(EnhancementFeedback feedback, CancellationToken cancellationToken);
     Task<IReadOnlyList<EnhancementFeedback>> GetFeedbackAsync(CancellationToken cancellationToken);

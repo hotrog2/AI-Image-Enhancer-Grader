@@ -19,6 +19,9 @@ public sealed class EditorWorkflowService(
     public Task<IReadOnlyList<CatalogAsset>> GetAssetsAsync(CancellationToken cancellationToken) =>
         catalogService.GetAssetsAsync(cancellationToken);
 
+    public Task DeleteAssetAsync(Guid assetId, CancellationToken cancellationToken) =>
+        catalogService.DeleteAssetAsync(assetId, cancellationToken);
+
     public async Task<IReadOnlyList<CatalogAssetListItem>> GetLibraryItemsAsync(CancellationToken cancellationToken)
     {
         var assets = await catalogService.GetAssetsAsync(cancellationToken);

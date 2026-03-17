@@ -53,6 +53,7 @@ public sealed class PreferenceStyleLearningServiceTests
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<CatalogFolder>> GetFoldersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogFolder>>([]);
         public Task<IReadOnlyList<CatalogAsset>> GetAssetsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogAsset>>([]);
+        public Task DeleteAssetAsync(Guid assetId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<int> ImportFolderAsync(string folderPath, bool recursive, CancellationToken cancellationToken) => Task.FromResult(0);
         public Task SaveFeedbackAsync(EnhancementFeedback feedback, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<EnhancementFeedback>> GetFeedbackAsync(CancellationToken cancellationToken) => Task.FromResult(feedback);

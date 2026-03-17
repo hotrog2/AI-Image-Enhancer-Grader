@@ -201,6 +201,76 @@ public sealed class SqliteCatalogService : ICatalogService
         return assets;
     }
 
+    public async Task DeleteAssetAsync(Guid assetId, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        string? thumbnailPath = null;
+        string? folderId = null;
+
+        await using (var selectAssetCommand = connection.CreateCommand())
+        {
+            selectAssetCommand.Transaction = transaction;
+            selectAssetCommand.CommandText = "SELECT FolderId FROM Assets WHERE Id = $assetId;";
+            selectAssetCommand.Parameters.AddWithValue("$assetId", assetId.ToString());
+            folderId = await selectAssetCommand.ExecuteScalarAsync(cancellationToken) as string;
+        }
+
+        if (folderId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return;
+        }
+
+        await using (var selectThumbnailCommand = connection.CreateCommand())
+        {
+            selectThumbnailCommand.Transaction = transaction;
+            selectThumbnailCommand.CommandText = "SELECT ThumbnailPath FROM ThumbnailCache WHERE AssetId = $assetId;";
+            selectThumbnailCommand.Parameters.AddWithValue("$assetId", assetId.ToString());
+            thumbnailPath = await selectThumbnailCommand.ExecuteScalarAsync(cancellationToken) as string;
+        }
+
+        foreach (var statement in new[]
+                 {
+                     "DELETE FROM ThumbnailCache WHERE AssetId = $assetId;",
+                     "DELETE FROM ExportHistory WHERE AssetId = $assetId;",
+                     "DELETE FROM Feedback WHERE AssetId = $assetId;",
+                     "DELETE FROM Assets WHERE Id = $assetId;"
+                 })
+        {
+            await using var deleteCommand = connection.CreateCommand();
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandText = statement;
+            deleteCommand.Parameters.AddWithValue("$assetId", assetId.ToString());
+            await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var countFolderAssetsCommand = connection.CreateCommand())
+        {
+            countFolderAssetsCommand.Transaction = transaction;
+            countFolderAssetsCommand.CommandText = "SELECT COUNT(*) FROM Assets WHERE FolderId = $folderId;";
+            countFolderAssetsCommand.Parameters.AddWithValue("$folderId", folderId);
+            var remainingAssets = Convert.ToInt32(await countFolderAssetsCommand.ExecuteScalarAsync(cancellationToken));
+
+            if (remainingAssets == 0)
+            {
+                await using var deleteFolderCommand = connection.CreateCommand();
+                deleteFolderCommand.Transaction = transaction;
+                deleteFolderCommand.CommandText = "DELETE FROM Folders WHERE Id = $folderId;";
+                deleteFolderCommand.Parameters.AddWithValue("$folderId", folderId);
+                await deleteFolderCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(thumbnailPath) && File.Exists(thumbnailPath))
+        {
+            File.Delete(thumbnailPath);
+        }
+    }
+
     public async Task<int> ImportFolderAsync(string folderPath, bool recursive, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(folderPath))

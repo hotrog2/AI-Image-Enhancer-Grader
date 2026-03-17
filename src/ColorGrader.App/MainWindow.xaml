@@ -82,7 +82,17 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock FontSize="22" FontWeight="SemiBold" Text="Library" />
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Text="Library" />
+                        <Button MinWidth="138"
+                                HorizontalAlignment="Right"
+                                Command="{Binding DeleteSelectedAssetCommand}"
+                                Content="Remove from Library"
+                                Style="{StaticResource DangerButtonStyle}" />
+                    </DockPanel>
 
                     <TextBlock Grid.Row="1"
                                Margin="0,6,0,14"
