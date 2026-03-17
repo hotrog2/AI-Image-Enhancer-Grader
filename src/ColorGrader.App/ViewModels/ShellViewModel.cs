@@ -886,7 +886,7 @@ public partial class ShellViewModel(
                     DetailRecovery: 0,
                     Deblur: 0,
                     ArtifactReduction: 0,
-                    RealismBoost: 0),
+                    RealismBoost: 0)),
             CreatedAt: DateTimeOffset.UtcNow);
     }
 
