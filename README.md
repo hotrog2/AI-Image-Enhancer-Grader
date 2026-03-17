@@ -161,6 +161,41 @@ dotnet test ColorGrader.sln
 dotnet run --project .\src\ColorGrader.App\ColorGrader.App.csproj
 ```
 
+## Packaging
+
+The repo now includes a Windows packaging flow under `build/`.
+
+### Build Release Packages
+
+```powershell
+.\build\Package-ColorGrader.ps1
+```
+
+That script produces:
+- `artifacts\publish\win-x64\` with the self-contained published app
+- `artifacts\packages\ColorGrader-win-x64-portable.zip`
+- `artifacts\packages\ColorGrader-win-x64-installer.zip`
+
+### Install From the Installer Package
+
+After extracting `ColorGrader-win-x64-installer.zip`:
+
+```powershell
+.\Install-ColorGrader.ps1
+```
+
+Optional desktop shortcut:
+
+```powershell
+.\Install-ColorGrader.ps1 -CreateDesktopShortcut
+```
+
+Default install location:
+
+```text
+%LocalAppData%\Programs\ColorGrader
+```
+
 ## Local Storage
 
 The app stores its local data here:
