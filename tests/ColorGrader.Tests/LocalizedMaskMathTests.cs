@@ -12,7 +12,7 @@ public sealed class LocalizedMaskMathTests
         {
             IsEnabled = true,
             Kind = LocalizedMaskKind.Radial,
-            Adjustments = new ManualEnhancementAdjustments(0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            Adjustments = new ManualEnhancementAdjustments(0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         };
 
         var centerWeight = LocalizedMaskMath.GetMaskWeight(50, 50, 100, 100, settings, null);
@@ -30,7 +30,7 @@ public sealed class LocalizedMaskMathTests
             IsEnabled = true,
             Kind = LocalizedMaskKind.Subject,
             Intensity = 1.0,
-            Adjustments = new ManualEnhancementAdjustments(0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            Adjustments = new ManualEnhancementAdjustments(0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         };
 
         var prediction = new SubjectMaskPrediction(2, 2, [0f, 1f, 0f, 0f]);

@@ -11,8 +11,18 @@ namespace ColorGrader.App;
 
 public partial class MainWindow : Window
 {
+    private enum CropDragMode
+    {
+        None,
+        Create,
+        Move
+    }
+
     private readonly ShellViewModel _viewModel;
     private bool _isDraggingPreview;
+    private CropDragMode _cropDragMode;
+    private Point _dragStartNormalized;
+    private CropStraightenSettings _dragStartCrop = CropStraightenSettings.Default;
 
     public MainWindow(ShellViewModel viewModel)
     {
@@ -34,6 +44,13 @@ public partial class MainWindow : Window
 
     private void EnhancedPreviewHost_OnSizeChanged(object sender, SizeChangedEventArgs e) => UpdateInteractiveOverlay();
 
+    private void EnterCropModeButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedCanvasEditorTool = CanvasEditorTool.Crop;
+        EditorPreviewTabs.SelectedIndex = 2;
+        UpdateInteractiveOverlay();
+    }
+
     private void EnhancedPreviewHost_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_viewModel.EnhancedPreview is null || !TryGetNormalizedPoint(e.GetPosition(EnhancedPreviewHost), out var normalized))
@@ -41,10 +58,27 @@ public partial class MainWindow : Window
             return;
         }
 
-        _isDraggingPreview = true;
-        EnhancedPreviewHost.CaptureMouse();
-        ApplyCanvasInteraction(normalized);
-        e.Handled = true;
+        switch (_viewModel.SelectedCanvasEditorTool)
+        {
+            case CanvasEditorTool.Crop:
+                _isDraggingPreview = true;
+                _cropDragMode = _viewModel.IsPointInsideCrop(normalized.X, normalized.Y)
+                    ? CropDragMode.Move
+                    : CropDragMode.Create;
+                _dragStartNormalized = normalized;
+                _dragStartCrop = _viewModel.GetCropStraightenSettings();
+                _viewModel.BeginInteractiveCanvasEdit();
+                EnhancedPreviewHost.CaptureMouse();
+                e.Handled = true;
+                break;
+            case CanvasEditorTool.LocalizedMask when _viewModel.LocalizedMaskEnabled:
+                _isDraggingPreview = true;
+                _viewModel.BeginInteractiveCanvasEdit();
+                EnhancedPreviewHost.CaptureMouse();
+                _viewModel.MoveLocalizedMaskCenterFromCanvas(normalized.X, normalized.Y);
+                e.Handled = true;
+                break;
+        }
     }
 
     private void EnhancedPreviewHost_OnPreviewMouseMove(object sender, MouseEventArgs e)
@@ -66,7 +100,9 @@ public partial class MainWindow : Window
         }
 
         _isDraggingPreview = false;
+        _cropDragMode = CropDragMode.None;
         EnhancedPreviewHost.ReleaseMouseCapture();
+        _viewModel.EndInteractiveCanvasEdit();
         e.Handled = true;
     }
 
@@ -80,9 +116,6 @@ public partial class MainWindow : Window
         var step = e.Delta > 0 ? 0.03 : -0.03;
         switch (_viewModel.SelectedCanvasEditorTool)
         {
-            case CanvasEditorTool.Crop:
-                _viewModel.AdjustCropZoom(step);
-                break;
             case CanvasEditorTool.LocalizedMask:
                 _viewModel.AdjustLocalizedMaskSize(step);
                 break;
@@ -98,7 +131,23 @@ public partial class MainWindow : Window
         switch (_viewModel.SelectedCanvasEditorTool)
         {
             case CanvasEditorTool.Crop:
-                _viewModel.MoveCropCenterFromCanvas(normalized.X, normalized.Y);
+                switch (_cropDragMode)
+                {
+                    case CropDragMode.Create when HasMeaningfulCropDrag(normalized):
+                        _viewModel.SetCropRectangleFromCanvas(
+                            _dragStartNormalized.X,
+                            _dragStartNormalized.Y,
+                            normalized.X,
+                            normalized.Y);
+                        break;
+                    case CropDragMode.Move:
+                        _viewModel.MoveCropRectangleFromCanvas(
+                            _dragStartCrop.CropLeft,
+                            _dragStartCrop.CropTop,
+                            normalized.X - _dragStartNormalized.X,
+                            normalized.Y - _dragStartNormalized.Y);
+                        break;
+                }
                 break;
             case CanvasEditorTool.LocalizedMask:
                 if (_viewModel.LocalizedMaskEnabled)
@@ -144,12 +193,8 @@ public partial class MainWindow : Window
 
     private void UpdateCropOverlay(Rect imageBounds)
     {
-        var cropSettings = new CropStraightenSettings(
-            _viewModel.StraightenAngle,
-            _viewModel.CropZoom,
-            _viewModel.CropOffsetX,
-            _viewModel.CropOffsetY);
-        var shouldShow = _viewModel.SelectedCanvasEditorTool == CanvasEditorTool.Crop || !cropSettings.IsIdentity;
+        var cropSettings = _viewModel.GetCropStraightenSettings();
+        var shouldShow = !cropSettings.IsIdentity;
 
         if (!shouldShow)
         {
@@ -168,6 +213,10 @@ public partial class MainWindow : Window
         CropOverlayRectangle.Height = cropRectangle.Height;
         CropOverlayRectangle.Visibility = Visibility.Visible;
     }
+
+    private bool HasMeaningfulCropDrag(Point normalized) =>
+        Math.Abs(normalized.X - _dragStartNormalized.X) > 0.004 ||
+        Math.Abs(normalized.Y - _dragStartNormalized.Y) > 0.004;
 
     private void UpdateLocalizedMaskOverlay(Rect imageBounds)
     {

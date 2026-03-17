@@ -14,6 +14,7 @@ public partial class ShellViewModel(
     EditorWorkflowService workflowService,
     IFolderPickerService folderPickerService) : ObservableObject
 {
+    private const string NeonClubReferencePresetName = "Reference Look - Neon Club Glow";
     private CancellationTokenSource? _editorCancellationSource;
     private CancellationTokenSource? _exportCancellationSource;
     private bool _suppressPreviewRefresh;
@@ -123,6 +124,9 @@ public partial class ShellViewModel(
     private bool styleLearning = true;
 
     [ObservableProperty]
+    private bool qualityRestore = true;
+
+    [ObservableProperty]
     private double manualExposure;
 
     [ObservableProperty]
@@ -153,16 +157,31 @@ public partial class ShellViewModel(
     private double manualSharpen;
 
     [ObservableProperty]
+    private double manualDetailRecovery;
+
+    [ObservableProperty]
+    private double manualDeblur;
+
+    [ObservableProperty]
+    private double manualArtifactReduction;
+
+    [ObservableProperty]
+    private double manualRealismBoost;
+
+    [ObservableProperty]
     private double straightenAngle;
 
     [ObservableProperty]
-    private double cropZoom;
+    private double cropLeft;
 
     [ObservableProperty]
-    private double cropOffsetX;
+    private double cropTop;
 
     [ObservableProperty]
-    private double cropOffsetY;
+    private double cropWidth = 1.0;
+
+    [ObservableProperty]
+    private double cropHeight = 1.0;
 
     [ObservableProperty]
     private bool localizedMaskEnabled;
@@ -233,6 +252,7 @@ public partial class ShellViewModel(
     private async Task InitializeAsync()
     {
         await workflowService.InitializeAsync(CancellationToken.None);
+        await EnsureBuiltInPresetsAsync();
         await RefreshLibraryAsync();
         await LoadRecentExportsAsync();
         await LoadPresetsAsync();
@@ -322,6 +342,10 @@ public partial class ShellViewModel(
         ManualSkinSoftening = 0;
         ManualDenoise = 0;
         ManualSharpen = 0;
+        ManualDetailRecovery = 0;
+        ManualDeblur = 0;
+        ManualArtifactReduction = 0;
+        ManualRealismBoost = 0;
         _suppressPreviewRefresh = false;
         _ = LoadSelectedAssetAsync();
     }
@@ -331,9 +355,10 @@ public partial class ShellViewModel(
     {
         _suppressPreviewRefresh = true;
         StraightenAngle = 0;
-        CropZoom = 0;
-        CropOffsetX = 0;
-        CropOffsetY = 0;
+        CropLeft = 0;
+        CropTop = 0;
+        CropWidth = 1;
+        CropHeight = 1;
         _suppressPreviewRefresh = false;
         _ = LoadSelectedAssetAsync();
     }
@@ -782,6 +807,7 @@ public partial class ShellViewModel(
         if (Sharpen) features |= EnhancementFeature.Sharpen;
         if (Upscale) features |= EnhancementFeature.Upscale;
         if (StyleLearning) features |= EnhancementFeature.StyleLearning;
+        if (QualityRestore) features |= EnhancementFeature.QualityRestore;
 
         return features;
     }
@@ -790,28 +816,140 @@ public partial class ShellViewModel(
 
     private string BuildDefaultStyleProfileName() => $"Style {DateTime.Now:yyyy-MM-dd HHmm}";
 
-    private CropStraightenSettings BuildCropStraightenSettings() => new(
-        RotationDegrees: StraightenAngle,
-        Zoom: CropZoom,
-        OffsetX: CropOffsetX,
-        OffsetY: CropOffsetY);
-
-    public void MoveCropCenterFromCanvas(double normalizedX, double normalizedY)
+    private async Task EnsureBuiltInPresetsAsync()
     {
-        var zoom = Math.Clamp(CropZoom, 0.0, 0.65);
-        if (zoom <= 0.0001)
+        var existingPresets = await workflowService.GetPresetsAsync(CancellationToken.None);
+        if (existingPresets.Any(preset => string.Equals(preset.Name, NeonClubReferencePresetName, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        var maxOffsetFactor = zoom / 2.0;
-        CropOffsetX = Math.Clamp((normalizedX - 0.5) / maxOffsetFactor, -1.0, 1.0);
-        CropOffsetY = Math.Clamp((normalizedY - 0.5) / maxOffsetFactor, -1.0, 1.0);
+        await workflowService.SavePresetAsync(BuildNeonClubReferencePreset(), CancellationToken.None);
     }
 
-    public void AdjustCropZoom(double delta)
+    private static SavedPreset BuildNeonClubReferencePreset()
     {
-        CropZoom = Math.Clamp(CropZoom + delta, 0.0, 0.65);
+        var featureMask =
+            EnhancementFeature.AutoExposure |
+            EnhancementFeature.WhiteBalance |
+            EnhancementFeature.Contrast |
+            EnhancementFeature.ToneCurve |
+            EnhancementFeature.SkinTone |
+            EnhancementFeature.Denoise |
+            EnhancementFeature.Sharpen |
+            EnhancementFeature.StyleLearning |
+            EnhancementFeature.QualityRestore;
+
+        return new SavedPreset(
+            Id: 0,
+            Name: NeonClubReferencePresetName,
+            FeatureMask: featureMask,
+            Strength: 1.0,
+            ManualAdjustments: new ManualEnhancementAdjustments(
+                Exposure: 0.18,
+                Contrast: 0.16,
+                Warmth: 0.11,
+                Saturation: 0.10,
+                Vibrance: 0.16,
+                HighlightRecovery: 0.08,
+                ShadowLift: -0.04,
+                SkinSoftening: 0.04,
+                Denoise: 0.08,
+                Sharpen: 0.10,
+                DetailRecovery: 0.14,
+                Deblur: 0.10,
+                ArtifactReduction: 0.06,
+                RealismBoost: 0.14),
+            CropStraighten: CropStraightenSettings.Default,
+            LocalizedMask: new LocalizedMaskSettings(
+                IsEnabled: true,
+                Kind: LocalizedMaskKind.Subject,
+                CenterX: 0.5,
+                CenterY: 0.5,
+                Width: 0.70,
+                Height: 0.88,
+                Feather: 0.22,
+                AngleDegrees: 0,
+                Invert: false,
+                Intensity: 0.88,
+                Adjustments: new ManualEnhancementAdjustments(
+                    Exposure: 0.12,
+                    Contrast: 0.06,
+                    Warmth: 0.05,
+                    Saturation: 0.03,
+                    Vibrance: 0.07,
+                    HighlightRecovery: 0,
+                    ShadowLift: 0,
+                    SkinSoftening: 0.03,
+                    Denoise: 0.03,
+                    Sharpen: 0.05,
+                    DetailRecovery: 0,
+                    Deblur: 0,
+                    ArtifactReduction: 0,
+                    RealismBoost: 0),
+            CreatedAt: DateTimeOffset.UtcNow);
+    }
+
+    public void BeginInteractiveCanvasEdit() => _suppressPreviewRefresh = true;
+
+    public void EndInteractiveCanvasEdit(bool refreshPreview = true)
+    {
+        _suppressPreviewRefresh = false;
+        if (refreshPreview)
+        {
+            TriggerPreviewRefresh();
+        }
+    }
+
+    private CropStraightenSettings BuildCropStraightenSettings() => new(
+        RotationDegrees: StraightenAngle,
+        CropLeft: CropLeft,
+        CropTop: CropTop,
+        CropWidth: CropWidth,
+        CropHeight: CropHeight);
+
+    public CropStraightenSettings GetCropStraightenSettings() => BuildCropStraightenSettings();
+
+    public bool IsPointInsideCrop(double normalizedX, double normalizedY)
+    {
+        var crop = BuildCropStraightenSettings();
+        if (crop.IsIdentity)
+        {
+            return false;
+        }
+
+        return normalizedX >= crop.CropLeft &&
+               normalizedX <= crop.CropLeft + crop.CropWidth &&
+               normalizedY >= crop.CropTop &&
+               normalizedY <= crop.CropTop + crop.CropHeight;
+    }
+
+    public void SetCropRectangleFromCanvas(double startX, double startY, double endX, double endY)
+    {
+        const double minimumSize = 0.03;
+
+        var normalizedStartX = Math.Clamp(startX, 0.0, 1.0);
+        var normalizedStartY = Math.Clamp(startY, 0.0, 1.0);
+        var normalizedEndX = Math.Clamp(endX, 0.0, 1.0);
+        var normalizedEndY = Math.Clamp(endY, 0.0, 1.0);
+
+        var left = Math.Min(normalizedStartX, normalizedEndX);
+        var top = Math.Min(normalizedStartY, normalizedEndY);
+        var width = Math.Max(minimumSize, Math.Abs(normalizedEndX - normalizedStartX));
+        var height = Math.Max(minimumSize, Math.Abs(normalizedEndY - normalizedStartY));
+
+        CropWidth = Math.Clamp(width, minimumSize, 1.0);
+        CropHeight = Math.Clamp(height, minimumSize, 1.0);
+        CropLeft = Math.Clamp(left, 0.0, 1.0 - CropWidth);
+        CropTop = Math.Clamp(top, 0.0, 1.0 - CropHeight);
+    }
+
+    public void MoveCropRectangleFromCanvas(double baseLeft, double baseTop, double deltaX, double deltaY)
+    {
+        var clampedWidth = Math.Clamp(CropWidth, 0.03, 1.0);
+        var clampedHeight = Math.Clamp(CropHeight, 0.03, 1.0);
+        CropLeft = Math.Clamp(baseLeft + deltaX, 0.0, 1.0 - clampedWidth);
+        CropTop = Math.Clamp(baseTop + deltaY, 0.0, 1.0 - clampedHeight);
     }
 
     private ManualEnhancementAdjustments BuildManualAdjustments() => new(
@@ -824,7 +962,11 @@ public partial class ShellViewModel(
         ShadowLift: ManualShadowLift,
         SkinSoftening: ManualSkinSoftening,
         Denoise: ManualDenoise,
-        Sharpen: ManualSharpen);
+        Sharpen: ManualSharpen,
+        DetailRecovery: ManualDetailRecovery,
+        Deblur: ManualDeblur,
+        ArtifactReduction: ManualArtifactReduction,
+        RealismBoost: ManualRealismBoost);
 
     private LocalizedMaskSettings BuildLocalizedMaskSettings() => new(
         IsEnabled: LocalizedMaskEnabled,
@@ -847,7 +989,11 @@ public partial class ShellViewModel(
             ShadowLift: 0,
             SkinSoftening: LocalizedSkinSoftening,
             Denoise: LocalizedDenoise,
-            Sharpen: LocalizedSharpen));
+            Sharpen: LocalizedSharpen,
+            DetailRecovery: 0,
+            Deblur: 0,
+            ArtifactReduction: 0,
+            RealismBoost: 0));
 
     public void MoveLocalizedMaskCenterFromCanvas(double normalizedX, double normalizedY)
     {
@@ -874,6 +1020,7 @@ public partial class ShellViewModel(
         Sharpen = preset.FeatureMask.HasFlag(EnhancementFeature.Sharpen);
         Upscale = preset.FeatureMask.HasFlag(EnhancementFeature.Upscale);
         StyleLearning = preset.FeatureMask.HasFlag(EnhancementFeature.StyleLearning);
+        QualityRestore = preset.FeatureMask.HasFlag(EnhancementFeature.QualityRestore);
         EnhancementStrength = preset.Strength;
         ManualExposure = preset.ManualAdjustments.Exposure;
         ManualContrast = preset.ManualAdjustments.Contrast;
@@ -885,10 +1032,15 @@ public partial class ShellViewModel(
         ManualSkinSoftening = preset.ManualAdjustments.SkinSoftening;
         ManualDenoise = preset.ManualAdjustments.Denoise;
         ManualSharpen = preset.ManualAdjustments.Sharpen;
+        ManualDetailRecovery = preset.ManualAdjustments.DetailRecovery;
+        ManualDeblur = preset.ManualAdjustments.Deblur;
+        ManualArtifactReduction = preset.ManualAdjustments.ArtifactReduction;
+        ManualRealismBoost = preset.ManualAdjustments.RealismBoost;
         StraightenAngle = preset.CropStraighten.RotationDegrees;
-        CropZoom = preset.CropStraighten.Zoom;
-        CropOffsetX = preset.CropStraighten.OffsetX;
-        CropOffsetY = preset.CropStraighten.OffsetY;
+        CropLeft = preset.CropStraighten.CropLeft;
+        CropTop = preset.CropStraighten.CropTop;
+        CropWidth = preset.CropStraighten.CropWidth;
+        CropHeight = preset.CropStraighten.CropHeight;
         LocalizedMaskEnabled = preset.LocalizedMask.IsEnabled;
         SelectedLocalizedMaskKind = preset.LocalizedMask.Kind;
         LocalizedMaskCenterX = preset.LocalizedMask.CenterX;
@@ -920,6 +1072,7 @@ public partial class ShellViewModel(
     partial void OnSharpenChanged(bool value) => TriggerPreviewRefresh();
     partial void OnUpscaleChanged(bool value) => TriggerPreviewRefresh();
     partial void OnStyleLearningChanged(bool value) => TriggerPreviewRefresh();
+    partial void OnQualityRestoreChanged(bool value) => TriggerPreviewRefresh();
     partial void OnEnhancementStrengthChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualExposureChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualContrastChanged(double value) => TriggerPreviewRefresh();
@@ -931,10 +1084,15 @@ public partial class ShellViewModel(
     partial void OnManualSkinSofteningChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualDenoiseChanged(double value) => TriggerPreviewRefresh();
     partial void OnManualSharpenChanged(double value) => TriggerPreviewRefresh();
+    partial void OnManualDetailRecoveryChanged(double value) => TriggerPreviewRefresh();
+    partial void OnManualDeblurChanged(double value) => TriggerPreviewRefresh();
+    partial void OnManualArtifactReductionChanged(double value) => TriggerPreviewRefresh();
+    partial void OnManualRealismBoostChanged(double value) => TriggerPreviewRefresh();
     partial void OnStraightenAngleChanged(double value) => TriggerPreviewRefresh();
-    partial void OnCropZoomChanged(double value) => TriggerPreviewRefresh();
-    partial void OnCropOffsetXChanged(double value) => TriggerPreviewRefresh();
-    partial void OnCropOffsetYChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropLeftChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropTopChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropWidthChanged(double value) => TriggerPreviewRefresh();
+    partial void OnCropHeightChanged(double value) => TriggerPreviewRefresh();
     partial void OnLocalizedMaskEnabledChanged(bool value) => TriggerPreviewRefresh();
     partial void OnSelectedLocalizedMaskKindChanged(LocalizedMaskKind value) => TriggerPreviewRefresh();
     partial void OnLocalizedMaskCenterXChanged(double value) => TriggerPreviewRefresh();

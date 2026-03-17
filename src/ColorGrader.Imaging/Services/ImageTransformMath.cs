@@ -7,22 +7,19 @@ public static class ImageTransformMath
 {
     public static Rectangle CalculateCropRectangle(int width, int height, CropStraightenSettings settings)
     {
-        var zoom = Math.Clamp(settings.Zoom, 0.0, 0.75);
-        var scale = Math.Clamp(1.0 - zoom, 0.25, 1.0);
+        var minWidth = 1.0 / Math.Max(1, width);
+        var minHeight = 1.0 / Math.Max(1, height);
 
-        var cropWidth = Math.Max(1, (int)Math.Round(width * scale));
-        var cropHeight = Math.Max(1, (int)Math.Round(height * scale));
-        var maxOffsetX = (width - cropWidth) / 2.0;
-        var maxOffsetY = (height - cropHeight) / 2.0;
+        var normalizedWidth = Math.Clamp(settings.CropWidth, minWidth, 1.0);
+        var normalizedHeight = Math.Clamp(settings.CropHeight, minHeight, 1.0);
+        var normalizedLeft = Math.Clamp(settings.CropLeft, 0.0, 1.0 - normalizedWidth);
+        var normalizedTop = Math.Clamp(settings.CropTop, 0.0, 1.0 - normalizedHeight);
 
-        var centerX = (width / 2.0) + (Math.Clamp(settings.OffsetX, -1.0, 1.0) * maxOffsetX);
-        var centerY = (height / 2.0) + (Math.Clamp(settings.OffsetY, -1.0, 1.0) * maxOffsetY);
-        var left = (int)Math.Round(centerX - (cropWidth / 2.0));
-        var top = (int)Math.Round(centerY - (cropHeight / 2.0));
+        var left = Math.Clamp((int)Math.Floor(normalizedLeft * width), 0, Math.Max(0, width - 1));
+        var top = Math.Clamp((int)Math.Floor(normalizedTop * height), 0, Math.Max(0, height - 1));
+        var right = Math.Clamp((int)Math.Ceiling((normalizedLeft + normalizedWidth) * width), left + 1, width);
+        var bottom = Math.Clamp((int)Math.Ceiling((normalizedTop + normalizedHeight) * height), top + 1, height);
 
-        left = Math.Clamp(left, 0, Math.Max(0, width - cropWidth));
-        top = Math.Clamp(top, 0, Math.Max(0, height - cropHeight));
-
-        return new Rectangle(left, top, cropWidth, cropHeight);
+        return new Rectangle(left, top, right - left, bottom - top);
     }
 }

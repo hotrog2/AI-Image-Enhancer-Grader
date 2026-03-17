@@ -12,5 +12,6 @@ public enum EnhancementFeature
     Denoise = 1 << 5,
     Sharpen = 1 << 6,
     Upscale = 1 << 7,
-    StyleLearning = 1 << 8
+    StyleLearning = 1 << 8,
+    QualityRestore = 1 << 9
 }

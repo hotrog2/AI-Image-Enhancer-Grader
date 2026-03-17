@@ -6,6 +6,7 @@ It is designed for photographers who want:
 - offline editing
 - fast library import and cataloging
 - one-click enhancement with selectable features
+- stronger image restoration for soft or compressed images
 - manual fine-tuning after the auto pass
 - reusable presets
 - style learning from accepted edits
@@ -25,9 +26,10 @@ What is working now:
 - one-click enhancement preview
 - feature toggles for enhancement passes
 - manual fine-tune sliders
-- crop and straighten controls
+- drag-and-drop crop with separate straighten controls
 - localized masking with radial, linear, and AI-subject modes
 - saved enhancement presets
+- built-in `Reference Look - Neon Club Glow` starter preset
 - style profiles with accept/decline feedback learning
 - batch export to `JPG` and `PNG`
 - recent export history
@@ -35,12 +37,12 @@ What is working now:
 - install and uninstall PowerShell scripts
 - JPEG, PNG, and RAW catalog support
 - RAW decode chain using `WIC` and `LibRaw`
-- ONNX Runtime + DirectML inference plumbing for AI subject masks
+- ONNX Runtime + DirectML inference plumbing for AI subject masks and optional quality restoration
 
 What is still incomplete:
 - true production-grade RAW workflow validation across real camera samples
-- advanced localized masking
-- production-validated subject segmentation model distribution
+- production-validated bundled subject-segmentation model distribution
+- production-validated bundled restoration model distribution
 
 ## Tech Stack
 
@@ -51,6 +53,8 @@ What is still incomplete:
 - `CommunityToolkit.Mvvm`
 - `ImageSharp`
 - `LibRaw` via `HurlbertVisionLab.LibRawWrapper`
+- `ONNX Runtime`
+- `DirectML`
 
 ## Current Features
 
@@ -73,10 +77,12 @@ What is still incomplete:
   - sharpen
   - upscale flag
   - style learning
+  - AI quality restore
 - Enhancement strength slider
 - Before/after preview tabs
-- Crop zoom, crop offset, and straighten controls
-- On-canvas crop and localized-mask repositioning in the Enhanced preview tab
+- Drag-and-drop crop box in the Enhanced preview tab
+- Straighten controls
+- On-canvas localized-mask repositioning in the Enhanced preview tab
 - Manual fine-tune controls for:
   - exposure
   - contrast
@@ -88,10 +94,15 @@ What is still incomplete:
   - skin softening
   - denoise
   - sharpen
+  - detail recovery
+  - deblur
+  - artifact reduction
+  - realism boost
 
 ### Learning and Reuse
 
 - Save named enhancement presets, including crop/straighten and localized-mask settings
+- Start from the built-in `Reference Look - Neon Club Glow` preset derived from an accepted nightclub-style reference edit
 - Create named style profiles
 - Accept or decline results to train a selected profile
 - Fall back to catalog-wide history when no style profile is selected
@@ -102,7 +113,7 @@ What is still incomplete:
 - Linear gradient mask
 - AI subject mask mode backed by `ONNX Runtime + DirectML`
 - Drag the localized mask directly in the Enhanced preview tab
-- Use the mouse wheel in the Enhanced preview tab to resize the active crop/mask tool
+- Use the mouse wheel in the Enhanced preview tab to resize the active localized mask
 - Localized adjustments for:
   - exposure
   - contrast
@@ -141,6 +152,32 @@ The current pipeline tries:
 3. matching `JPG/PNG` proxy fallback when available
 
 This is enough to scaffold the workflow, but it has not yet been validated against a broad set of real camera RAW files.
+
+## Optional Local AI Models
+
+The app supports optional local ONNX models for advanced features.
+
+### Subject Mask Model
+
+Place a compatible segmentation model here:
+
+```text
+%LocalAppData%\ColorGrader\models\subject-mask.onnx
+```
+
+### Quality Restoration Model
+
+Place a compatible restoration model here:
+
+```text
+%LocalAppData%\ColorGrader\models\quality-restore.onnx
+```
+
+Notes:
+- if DirectML initializes successfully, the app uses the GPU path
+- if DirectML initialization fails, the app attempts a CPU fallback
+- if no restoration model is present, the app still uses the built-in deterministic restoration fallback
+- if no subject-mask model is present, radial and linear localized masks still work
 
 ## Project Layout
 
@@ -185,7 +222,7 @@ dotnet run --project .\src\ColorGrader.App\ColorGrader.App.csproj
 
 ## Packaging
 
-The repo now includes a Windows packaging flow under `build/`.
+The repo includes a Windows packaging flow under `build/`.
 
 ### Build Release Packages
 
@@ -218,21 +255,6 @@ Default install location:
 %LocalAppData%\Programs\ColorGrader
 ```
 
-## AI Subject Mask Model
-
-The app now includes optional AI subject-mask inference through `ONNX Runtime + DirectML`.
-
-To enable it, place a compatible segmentation model here:
-
-```text
-%LocalAppData%\ColorGrader\models\subject-mask.onnx
-```
-
-Notes:
-- if DirectML initializes successfully, the app uses the GPU path
-- if DirectML initialization fails, the app attempts a CPU fallback
-- if no model is present, radial and linear localized masks still work
-
 ## Local Storage
 
 The app stores its local data here:
@@ -244,19 +266,20 @@ The app stores its local data here:
 That folder currently contains:
 - `catalog.db` for SQLite catalog data
 - `thumbs\` for cached thumbnails
+- `models\` for optional local ONNX models
 
 ## Notes
 
 - The app is local-first and intended for lawful photography workflows.
 - No cloud account is required.
-- The current enhancement logic is deterministic and feedback-driven; it is not yet using a dedicated GPU inference model.
-- The current GPU inference path is used for optional AI subject masks when a compatible ONNX model is installed.
+- The enhancement workflow is a mix of deterministic processing, feedback-driven style learning, and optional local ONNX inference.
+- The current GPU inference path is used for optional AI subject masks and optional quality restoration when compatible ONNX models are installed.
 
 ## Roadmap
 
 - validate RAW processing against real camera files
 - improve localized masking with richer region tools and better subject models
-- add stronger model-based denoise / upscale passes
+- bundle production-ready local restoration and segmentation models
 - add publish profiles for Windows release builds
 
 ## Verification

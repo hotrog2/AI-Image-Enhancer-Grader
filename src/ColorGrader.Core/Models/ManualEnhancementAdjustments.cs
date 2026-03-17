@@ -10,7 +10,11 @@ public sealed record ManualEnhancementAdjustments(
     double ShadowLift,
     double SkinSoftening,
     double Denoise,
-    double Sharpen)
+    double Sharpen,
+    double DetailRecovery,
+    double Deblur,
+    double ArtifactReduction,
+    double RealismBoost)
 {
     public static ManualEnhancementAdjustments None { get; } = new(
         Exposure: 0,
@@ -22,7 +26,11 @@ public sealed record ManualEnhancementAdjustments(
         ShadowLift: 0,
         SkinSoftening: 0,
         Denoise: 0,
-        Sharpen: 0);
+        Sharpen: 0,
+        DetailRecovery: 0,
+        Deblur: 0,
+        ArtifactReduction: 0,
+        RealismBoost: 0);
 
     public bool HasAdjustments =>
         Exposure != 0 ||
@@ -34,5 +42,9 @@ public sealed record ManualEnhancementAdjustments(
         ShadowLift != 0 ||
         SkinSoftening != 0 ||
         Denoise != 0 ||
-        Sharpen != 0;
+        Sharpen != 0 ||
+        DetailRecovery != 0 ||
+        Deblur != 0 ||
+        ArtifactReduction != 0 ||
+        RealismBoost != 0;
 }

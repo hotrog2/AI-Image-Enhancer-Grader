@@ -32,7 +32,13 @@ public partial class App : System.Windows.Application
                     var paths = serviceProvider.GetRequiredService<AppDataPaths>();
                     return new SubjectMaskInferenceOptions(Path.Combine(paths.ModelsFolder, "subject-mask.onnx"));
                 });
+                services.AddSingleton(serviceProvider =>
+                {
+                    var paths = serviceProvider.GetRequiredService<AppDataPaths>();
+                    return new QualityRestorationInferenceOptions(Path.Combine(paths.ModelsFolder, "quality-restore.onnx"));
+                });
                 services.AddSingleton<ISubjectMaskInferenceService, OnnxDirectMlSubjectMaskInferenceService>();
+                services.AddSingleton<IQualityRestorationInferenceService, OnnxDirectMlQualityRestorationInferenceService>();
                 services.AddSingleton<IRawDecoder>(serviceProvider => new CompositeRawDecoder(
                     [
                         serviceProvider.GetRequiredService<WicRawDecoder>(),

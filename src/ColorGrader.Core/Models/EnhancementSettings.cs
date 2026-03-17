@@ -11,7 +11,11 @@ public sealed record EnhancementSettings(
     double SkinSoftening,
     double Denoise,
     double Sharpen,
-    double UpscaleFactor)
+    double UpscaleFactor,
+    double DetailRecovery,
+    double Deblur,
+    double ArtifactReduction,
+    double RealismBoost)
 {
     public static EnhancementSettings Default { get; } = new(
         Exposure: 0.10,
@@ -24,7 +28,11 @@ public sealed record EnhancementSettings(
         SkinSoftening: 0.06,
         Denoise: 0.12,
         Sharpen: 0.18,
-        UpscaleFactor: 1.0);
+        UpscaleFactor: 1.0,
+        DetailRecovery: 0.20,
+        Deblur: 0.18,
+        ArtifactReduction: 0.16,
+        RealismBoost: 0.12);
 
     public EnhancementSettings ApplyFeatureMask(EnhancementFeature featureMask)
     {
@@ -40,7 +48,11 @@ public sealed record EnhancementSettings(
             SkinSoftening = featureMask.HasFlag(EnhancementFeature.SkinTone) ? SkinSoftening : 0,
             Denoise = featureMask.HasFlag(EnhancementFeature.Denoise) ? Denoise : 0,
             Sharpen = featureMask.HasFlag(EnhancementFeature.Sharpen) ? Sharpen : 0,
-            UpscaleFactor = featureMask.HasFlag(EnhancementFeature.Upscale) ? UpscaleFactor : 1.0
+            UpscaleFactor = featureMask.HasFlag(EnhancementFeature.Upscale) ? UpscaleFactor : 1.0,
+            DetailRecovery = featureMask.HasFlag(EnhancementFeature.QualityRestore) ? DetailRecovery : 0,
+            Deblur = featureMask.HasFlag(EnhancementFeature.QualityRestore) ? Deblur : 0,
+            ArtifactReduction = featureMask.HasFlag(EnhancementFeature.QualityRestore) ? ArtifactReduction : 0,
+            RealismBoost = featureMask.HasFlag(EnhancementFeature.QualityRestore) ? RealismBoost : 0
         };
     }
 
@@ -60,7 +72,11 @@ public sealed record EnhancementSettings(
             SkinSoftening = SkinSoftening * normalized,
             Denoise = Denoise * normalized,
             Sharpen = Sharpen * normalized,
-            UpscaleFactor = 1.0 + ((UpscaleFactor - 1.0) * normalized)
+            UpscaleFactor = 1.0 + ((UpscaleFactor - 1.0) * normalized),
+            DetailRecovery = DetailRecovery * normalized,
+            Deblur = Deblur * normalized,
+            ArtifactReduction = ArtifactReduction * normalized,
+            RealismBoost = RealismBoost * normalized
         };
     }
 
@@ -77,7 +93,11 @@ public sealed record EnhancementSettings(
             ShadowLift = Math.Clamp(ShadowLift + adjustments.ShadowLift, -0.5, 1.0),
             SkinSoftening = Math.Clamp(SkinSoftening + adjustments.SkinSoftening, 0.0, 1.0),
             Denoise = Math.Clamp(Denoise + adjustments.Denoise, 0.0, 1.0),
-            Sharpen = Math.Clamp(Sharpen + adjustments.Sharpen, 0.0, 1.0)
+            Sharpen = Math.Clamp(Sharpen + adjustments.Sharpen, 0.0, 1.0),
+            DetailRecovery = Math.Clamp(DetailRecovery + adjustments.DetailRecovery, 0.0, 1.0),
+            Deblur = Math.Clamp(Deblur + adjustments.Deblur, 0.0, 1.0),
+            ArtifactReduction = Math.Clamp(ArtifactReduction + adjustments.ArtifactReduction, 0.0, 1.0),
+            RealismBoost = Math.Clamp(RealismBoost + adjustments.RealismBoost, 0.0, 1.0)
         };
     }
 }

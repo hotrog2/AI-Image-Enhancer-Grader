@@ -15,14 +15,20 @@ public sealed class ImageProcessingService : IImageProcessingService
     private const int PreviewMaxDimension = 1400;
     private readonly IRawDecoder _rawDecoder;
     private readonly ISubjectMaskInferenceService _subjectMaskInferenceService;
+    private readonly IQualityRestorationInferenceService _qualityRestorationInferenceService;
 
-    public ImageProcessingService(IRawDecoder rawDecoder, ISubjectMaskInferenceService subjectMaskInferenceService)
+    public ImageProcessingService(
+        IRawDecoder rawDecoder,
+        ISubjectMaskInferenceService subjectMaskInferenceService,
+        IQualityRestorationInferenceService qualityRestorationInferenceService)
     {
         _rawDecoder = rawDecoder;
         _subjectMaskInferenceService = subjectMaskInferenceService;
+        _qualityRestorationInferenceService = qualityRestorationInferenceService;
     }
 
-    public string InferenceStatusSummary => _subjectMaskInferenceService.StatusSummary;
+    public string InferenceStatusSummary =>
+        $"{_subjectMaskInferenceService.StatusSummary}{Environment.NewLine}{_qualityRestorationInferenceService.StatusSummary}";
 
     public bool CanRender(string filePath)
     {
@@ -99,6 +105,7 @@ public sealed class ImageProcessingService : IImageProcessingService
             ResizeForPreview(image);
 
             var settings = suggestion.Settings.ApplyFeatureMask(suggestion.EnabledFeatures);
+            await ApplyQualityRestorationAsync(image, settings, cancellationToken);
             ApplyAdjustments(image, settings);
             await ApplyLocalizedMaskAsync(image, localizedMask, cancellationToken);
 
@@ -121,6 +128,7 @@ public sealed class ImageProcessingService : IImageProcessingService
             ApplyCropAndStraighten(image, request.CropStraighten);
 
             var settings = request.Suggestion.Settings.ApplyFeatureMask(request.Suggestion.EnabledFeatures);
+            await ApplyQualityRestorationAsync(image, settings, cancellationToken);
             ApplyAdjustments(image, settings);
             await ApplyLocalizedMaskAsync(image, request.LocalizedMask, cancellationToken);
             ResizeForExport(image, request.Preset.LongEdgePixels);
@@ -229,6 +237,35 @@ public sealed class ImageProcessingService : IImageProcessingService
         }
     }
 
+    private async Task ApplyQualityRestorationAsync(Image<Rgba32> image, EnhancementSettings settings, CancellationToken cancellationToken)
+    {
+        if (!HasQualityRestoration(settings))
+        {
+            return;
+        }
+
+        var aiBlend = (float)Math.Clamp(
+            ((settings.DetailRecovery * 0.35) +
+             (settings.Deblur * 0.35) +
+             (settings.ArtifactReduction * 0.20) +
+             (settings.RealismBoost * 0.10)),
+            0.0,
+            0.7);
+
+        if (aiBlend > 0.05)
+        {
+            using var aiRestored = await _qualityRestorationInferenceService.RestoreAsync(image, cancellationToken);
+            if (aiRestored is not null)
+            {
+                BlendImages(image, aiRestored, aiBlend);
+            }
+        }
+
+        ApplyArtifactReduction(image, settings.ArtifactReduction);
+        ApplyDetailRecovery(image, settings.DetailRecovery, settings.Deblur);
+        ApplyRealismBoost(image, settings.RealismBoost);
+    }
+
     private static void ApplyCropAndStraighten(Image<Rgba32> image, CropStraightenSettings cropStraighten)
     {
         image.Mutate(context => context.AutoOrient());
@@ -312,7 +349,124 @@ public sealed class ImageProcessingService : IImageProcessingService
         SkinSoftening: Math.Max(0.0, adjustments.SkinSoftening),
         Denoise: Math.Max(0.0, adjustments.Denoise),
         Sharpen: Math.Max(0.0, adjustments.Sharpen),
-        UpscaleFactor: 1.0);
+        UpscaleFactor: 1.0,
+        DetailRecovery: Math.Max(0.0, adjustments.DetailRecovery),
+        Deblur: Math.Max(0.0, adjustments.Deblur),
+        ArtifactReduction: Math.Max(0.0, adjustments.ArtifactReduction),
+        RealismBoost: Math.Max(0.0, adjustments.RealismBoost));
+
+    private static bool HasQualityRestoration(EnhancementSettings settings) =>
+        settings.DetailRecovery > 0.001 ||
+        settings.Deblur > 0.001 ||
+        settings.ArtifactReduction > 0.001 ||
+        settings.RealismBoost > 0.001;
+
+    private static void ApplyArtifactReduction(Image<Rgba32> image, double amount)
+    {
+        if (amount <= 0.01)
+        {
+            return;
+        }
+
+        using var softened = image.Clone(context => context.GaussianBlur((float)Math.Clamp(0.45 + (amount * 1.2), 0.4, 1.8)));
+        var blendWeight = (float)Math.Clamp(amount * 0.32, 0.04, 0.30);
+        BlendImages(image, softened, blendWeight);
+    }
+
+    private static void ApplyDetailRecovery(Image<Rgba32> image, double detailRecovery, double deblur)
+    {
+        var total = Math.Clamp((detailRecovery * 0.9) + (deblur * 1.1), 0.0, 1.0);
+        if (total <= 0.01)
+        {
+            return;
+        }
+
+        using var blurred = image.Clone(context => context.GaussianBlur((float)Math.Clamp(0.7 + ((1.0 - total) * 0.4), 0.5, 1.2)));
+        var gain = (float)Math.Clamp(0.55 + (total * 0.95), 0.55, 1.45);
+
+        image.ProcessPixelRows(blurred, (baseAccessor, blurredAccessor) =>
+        {
+            for (var y = 0; y < baseAccessor.Height; y++)
+            {
+                var baseRow = baseAccessor.GetRowSpan(y);
+                var blurredRow = blurredAccessor.GetRowSpan(y);
+                for (var x = 0; x < baseRow.Length; x++)
+                {
+                    ref var destination = ref baseRow[x];
+                    ref var softened = ref blurredRow[x];
+
+                    destination.R = ClampToByte(destination.R + ((destination.R - softened.R) * gain));
+                    destination.G = ClampToByte(destination.G + ((destination.G - softened.G) * gain));
+                    destination.B = ClampToByte(destination.B + ((destination.B - softened.B) * gain));
+                }
+            }
+        });
+    }
+
+    private static void ApplyRealismBoost(Image<Rgba32> image, double amount)
+    {
+        if (amount <= 0.01)
+        {
+            return;
+        }
+
+        var contrast = 1.0 + (amount * 0.12);
+        var saturation = 1.0 + (amount * 0.06);
+        var gamma = 1.0 - (amount * 0.05);
+
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < row.Length; x++)
+                {
+                    ref var pixel = ref row[x];
+                    var r = pixel.R / 255.0;
+                    var g = pixel.G / 255.0;
+                    var b = pixel.B / 255.0;
+
+                    r = Math.Pow(Math.Clamp(((r - 0.5) * contrast) + 0.5, 0.0, 1.0), gamma);
+                    g = Math.Pow(Math.Clamp(((g - 0.5) * contrast) + 0.5, 0.0, 1.0), gamma);
+                    b = Math.Pow(Math.Clamp(((b - 0.5) * contrast) + 0.5, 0.0, 1.0), gamma);
+
+                    var luma = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+                    r = Math.Clamp(luma + ((r - luma) * saturation), 0.0, 1.0);
+                    g = Math.Clamp(luma + ((g - luma) * saturation), 0.0, 1.0);
+                    b = Math.Clamp(luma + ((b - luma) * saturation), 0.0, 1.0);
+
+                    pixel.R = (byte)Math.Round(r * 255.0);
+                    pixel.G = (byte)Math.Round(g * 255.0);
+                    pixel.B = (byte)Math.Round(b * 255.0);
+                }
+            }
+        });
+    }
+
+    private static void BlendImages(Image<Rgba32> baseImage, Image<Rgba32> blendImage, float weight)
+    {
+        if (weight <= 0.001f)
+        {
+            return;
+        }
+
+        baseImage.ProcessPixelRows(blendImage, (baseAccessor, blendAccessor) =>
+        {
+            for (var y = 0; y < baseAccessor.Height; y++)
+            {
+                var baseRow = baseAccessor.GetRowSpan(y);
+                var blendRow = blendAccessor.GetRowSpan(y);
+                for (var x = 0; x < baseRow.Length; x++)
+                {
+                    ref var destination = ref baseRow[x];
+                    ref var source = ref blendRow[x];
+                    destination.R = Lerp(destination.R, source.R, weight);
+                    destination.G = Lerp(destination.G, source.G, weight);
+                    destination.B = Lerp(destination.B, source.B, weight);
+                }
+            }
+        });
+    }
 
     private static void ApplyWarmth(Image<Rgba32> image, double warmth)
     {
