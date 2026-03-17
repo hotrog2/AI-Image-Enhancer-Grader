@@ -29,6 +29,8 @@ What is working now:
 - style profiles with accept/decline feedback learning
 - batch export to `JPG` and `PNG`
 - recent export history
+- Windows packaging flow with portable and installer zip outputs
+- install and uninstall PowerShell scripts
 - JPEG, PNG, and RAW catalog support
 - RAW decode chain using `WIC` and `LibRaw`
 
@@ -36,7 +38,6 @@ What is still incomplete:
 - true production-grade RAW workflow validation across real camera samples
 - advanced localized masking
 - crop / straighten tools
-- installer / packaging flow
 - GPU inference models through `ONNX Runtime + DirectML`
 
 ## Tech Stack
@@ -221,7 +222,6 @@ That folder currently contains:
 - add crop and straighten
 - add localized masking and skin-aware region tools
 - add stronger model-based denoise / upscale passes
-- add packaging and installer support
 - add publish profiles for Windows release builds
 
 ## Verification
@@ -231,4 +231,5 @@ Latest verified commands:
 ```powershell
 dotnet build ColorGrader.sln
 dotnet test ColorGrader.sln
+.\build\Package-ColorGrader.ps1
 ```
