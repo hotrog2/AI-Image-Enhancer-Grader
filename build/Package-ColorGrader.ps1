@@ -1,25 +1,24 @@
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
-    [string]$RuntimeIdentifier = "win-x64"
+    [string]$RuntimeIdentifier = "win-x64",
+    [string]$Version = "0.1.0"
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $appProject = Join-Path $repoRoot "src\ColorGrader.App\ColorGrader.App.csproj"
+$installerScript = Join-Path $repoRoot "build\ColorGrader.iss"
 $publishProfile = "Release-win-x64"
 
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishDir = Join-Path $artifactsRoot "publish\$RuntimeIdentifier"
-$stagingDir = Join-Path $artifactsRoot "staging\$RuntimeIdentifier"
 $packageDir = Join-Path $artifactsRoot "packages"
 $portableZip = Join-Path $packageDir "ColorGrader-$RuntimeIdentifier-portable.zip"
-$installerZip = Join-Path $packageDir "ColorGrader-$RuntimeIdentifier-installer.zip"
-$installerRoot = Join-Path $stagingDir "ColorGrader-$RuntimeIdentifier-installer"
-$installerAppRoot = Join-Path $installerRoot "app"
+$setupExe = Join-Path $packageDir "ColorGrader-$RuntimeIdentifier-setup.exe"
 
-foreach ($path in @($publishDir, $stagingDir, $packageDir)) {
+foreach ($path in @($publishDir, $packageDir)) {
     if (Test-Path $path) {
         Remove-Item -Path $path -Recurse -Force
     }
@@ -42,30 +41,52 @@ if (-not (Test-Path $appExe)) {
     throw "Expected published executable was not found at $appExe"
 }
 
-Write-Host "Building package staging layout..."
-New-Item -ItemType Directory -Path $installerAppRoot -Force | Out-Null
-Copy-Item -Path (Join-Path $publishDir "*") -Destination $installerAppRoot -Recurse -Force
-Copy-Item -Path (Join-Path $repoRoot "build\Install-ColorGrader.ps1") -Destination (Join-Path $installerRoot "Install-ColorGrader.ps1")
-Copy-Item -Path (Join-Path $repoRoot "build\Uninstall-ColorGrader.ps1") -Destination (Join-Path $installerRoot "Uninstall-ColorGrader.ps1")
-
-@"
-ColorGrader package
-
-Portable:
-  Run app\ColorGrader.App.exe directly.
-
-Installed:
-  1. Right-click Install-ColorGrader.ps1 and run with PowerShell.
-  2. The script copies the app into `%LocalAppData%\Programs\ColorGrader`.
-  3. Start Menu and optional Desktop shortcuts are created.
-"@ | Set-Content -Path (Join-Path $installerRoot "README.txt")
-
-Write-Host "Creating zip artifacts..."
+Write-Host "Creating portable archive..."
 Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $portableZip -CompressionLevel Optimal
-Compress-Archive -Path (Join-Path $installerRoot "*") -DestinationPath $installerZip -CompressionLevel Optimal
+
+$isccCommand = Get-Command iscc.exe -ErrorAction SilentlyContinue
+if (-not $isccCommand) {
+    $defaultIsccPath = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+    if (Test-Path $defaultIsccPath) {
+        $isccCommand = Get-Item $defaultIsccPath
+    }
+}
+if (-not $isccCommand) {
+    $localIsccPath = Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"
+    if (Test-Path $localIsccPath) {
+        $isccCommand = Get-Item $localIsccPath
+    }
+}
+
+if (-not $isccCommand) {
+    throw "Inno Setup 6 was not found. Install JRSoftware.InnoSetup so the packaging flow can build a real setup executable."
+}
+
+$isccPath = if ($isccCommand -is [System.Management.Automation.CommandInfo]) {
+    $isccCommand.Source
+}
+else {
+    $isccCommand.FullName
+}
+
+Write-Host "Building setup executable..."
+& $isccPath `
+    "/DMyAppVersion=$Version" `
+    "/DAppPublishDir=$publishDir" `
+    "/DOutputDir=$packageDir" `
+    "/DOutputBaseFilename=ColorGrader-$RuntimeIdentifier-setup" `
+    $installerScript
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup build failed."
+}
+
+if (-not (Test-Path $setupExe)) {
+    throw "Expected setup executable was not found at $setupExe"
+}
 
 Write-Host ""
 Write-Host "Package flow complete."
 Write-Host "Publish output:  $publishDir"
 Write-Host "Portable zip:   $portableZip"
-Write-Host "Installer zip:  $installerZip"
+Write-Host "Setup exe:      $setupExe"

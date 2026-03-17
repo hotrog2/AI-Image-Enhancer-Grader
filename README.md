@@ -33,8 +33,7 @@ What is working now:
 - style profiles with accept/decline feedback learning
 - batch export to `JPG` and `PNG`
 - recent export history
-- Windows packaging flow with portable and installer zip outputs
-- install and uninstall PowerShell scripts
+- Windows packaging flow with portable zip and real `setup.exe` installer output
 - JPEG, PNG, and RAW catalog support
 - RAW decode chain using `WIC` and `LibRaw`
 - ONNX Runtime + DirectML inference plumbing for AI subject masks and optional quality restoration
@@ -198,6 +197,7 @@ tests/
 - Windows 10 or Windows 11
 - `x64` machine
 - `.NET 9 SDK`
+- `Inno Setup 6` if you want to build the installer locally
 - Visual Studio 2022 or newer, or the `dotnet` CLI
 
 ## Getting Started
@@ -233,20 +233,14 @@ The repo includes a Windows packaging flow under `build/`.
 That script produces:
 - `artifacts\publish\win-x64\` with the self-contained published app
 - `artifacts\packages\ColorGrader-win-x64-portable.zip`
-- `artifacts\packages\ColorGrader-win-x64-installer.zip`
+- `artifacts\packages\ColorGrader-win-x64-setup.exe`
 
-### Install From the Installer Package
+### Install From the Setup Executable
 
-After extracting `ColorGrader-win-x64-installer.zip`:
+Users can install by double-clicking:
 
-```powershell
-.\Install-ColorGrader.ps1
-```
-
-Optional desktop shortcut:
-
-```powershell
-.\Install-ColorGrader.ps1 -CreateDesktopShortcut
+```text
+artifacts\packages\ColorGrader-win-x64-setup.exe
 ```
 
 Default install location:
